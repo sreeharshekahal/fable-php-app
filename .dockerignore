@@ -1,0 +1,11 @@
+.git
+node_modules
+vendor
+.env
+.phpunit.result.cache
+bootstrap/cache/*.php
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/cache/*
+storage/logs/*
+.vscode
