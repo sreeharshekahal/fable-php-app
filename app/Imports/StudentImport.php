@@ -72,10 +72,10 @@ class StudentImport implements ToCollection, WithHeadingRow
             $genders = ['Male' => 0, 'Female' => 1, 'Others' => 2];
 
             $user_id = DB::table('auth_user')->insertGetId([
-                // 'first_name' => \Illuminate\Support\Facades\Crypt::encryptString($row['first_name']),
-                // 'last_name' => \Illuminate\Support\Facades\Crypt::encryptString($row['last_name']),
-                'first_name' => $row['first_name'],
-                'last_name' => $row['last_name'],
+                'first_name' => \Illuminate\Support\Facades\Crypt::encryptString($row['first_name']),
+                'last_name' => \Illuminate\Support\Facades\Crypt::encryptString($row['last_name']),
+                // 'first_name' => $row['first_name'],
+                // 'last_name' => $row['last_name'],
                 'password' => $hashedPassword,
                 'is_superuser' => 'f',
                 'username' => Str::uuid(),

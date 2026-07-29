@@ -395,7 +395,7 @@ class User extends Controller
                 ];
             }
         }
-        
+
         usort($resultArr, function ($a, $b) {
             $archivedTitles = ['Archived', 'Archive', 'आर्काइव', 'संग्रहणालय'];
             $aArchived = in_array($a['title'], $archivedTitles) || in_array(ucfirst(strtolower($a['title'])), $archivedTitles);
@@ -920,9 +920,17 @@ class User extends Controller
             hash_pbkdf2('sha256', $password, $salt, $iterations, 32, true)
         );
 
+        $firstName = $request->filled('first_name')
+            ? Crypt::encryptString($request->first_name)
+            : null;
+
+        $lastName = $request->filled('last_name')
+            ? Crypt::encryptString($request->last_name)
+            : null;
+
         $user = \App\Models\User::create([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'password' => $hashedPassword,
             'is_superuser' => 'f',
             'username' => Str::uuid(),
@@ -1007,6 +1015,10 @@ class User extends Controller
             ->where('title', 'Benchmarking')
             ->first();
 
+        if (!$level) {
+            return response()->json(['message' => 'Benchmarking level not found'], 404);
+        }
+
         $group = DB::table('organisation_group')
             ->where('organisation_id', $request->organisation)
             ->where('grade_id', $request->grade)
@@ -1065,8 +1077,12 @@ class User extends Controller
 
         $student->update($updateData);
 
-        // Parse input languages from request
-        $requestedLanguages = array_map('trim', explode(',', $request->languages));
+        // Parse input languages from request - the frontend sends a string or an array, supports both
+        $languages = $request->input('languages', []);
+
+        $requestedLanguages = is_array($languages)
+            ? array_map('trim', $languages)
+            : array_map('trim', explode(',', $languages));
 
         // Get language IDs for input names
         $requestedLanguageIds = DB::table('common_language')
@@ -1106,12 +1122,22 @@ class User extends Controller
 
         $user_id = $student->user_id;
 
-        DB::table('auth_user')
-            ->where('id', $user_id)
-            ->update([
-                'first_name' => $request->first_name,
-                'last_name' => $request->last_name
-            ]);
+        // Update Student First Name and Last Name
+        $userUpdate = [];
+
+        if ($request->filled('first_name')) {
+            $userUpdate['first_name'] = Crypt::encryptString($request->first_name);
+        }
+
+        if ($request->filled('last_name')) {
+            $userUpdate['last_name'] = Crypt::encryptString($request->last_name);
+        }
+
+        if (!empty($userUpdate)) {
+            DB::table('auth_user')
+                ->where('id', $user_id)
+                ->update($userUpdate);
+        }
 
         return response()->json(['success' => 'student updated successfully', 'data' => $student_id], 200);
     }
@@ -1266,8 +1292,8 @@ class User extends Controller
                 DB::raw("json_build_object(
             'id', g.id,
             'teachers_count', (
-                SELECT COUNT(DISTINCT atg.teacher_id) 
-                FROM access_teacher_groups atg 
+                SELECT COUNT(DISTINCT atg.teacher_id)
+                FROM access_teacher_groups atg
                 JOIN access_teacher as t ON atg.teacher_id = t.id
                 JOIN access_teacher_languages as atl ON t.id = atl.teacher_id
                 WHERE atg.group_id = g.id
@@ -1275,7 +1301,7 @@ class User extends Controller
                 AND atl.language_id = '" . $langId . "'
             ),
             'students_count', (
-                SELECT COUNT(*) 
+                SELECT COUNT(*)
                 FROM access_student as ast
                 " . ($hasLanguageParam ? "JOIN access_student_languages as astl ON ast.id = astl.student_id" : "") . "
                 WHERE ast." . (str_replace('s.', '', $selectedGroupColumn)) . " = g.id
@@ -1283,26 +1309,26 @@ class User extends Controller
                 " . (!empty($teacherDivisions) ? "AND UPPER(ast.division) IN (" . implode(',', array_map(fn($d) => "'" . $d . "'", $teacherDivisions)) . ")" : "") . "
             ),
             'last_assessment_time', (
-                SELECT ass.created 
-                FROM assessment_assessment ass 
+                SELECT ass.created
+                FROM assessment_assessment ass
                 JOIN access_student as asst ON ass.student_id = asst.id
                 JOIN passage_passage pp ON ass.passage_id = pp.id
                 WHERE pp.language_id = '" . $langId . "'
                 AND (ass.group_id = g.id OR asst." . (str_replace('s.', '', $selectedGroupColumn)) . " = g.id)
                 " . (!empty($teacherDivisions) ? "AND UPPER(asst.division) IN (" . implode(',', array_map(fn($d) => "'" . $d . "'", $teacherDivisions)) . ")" : "") . "
-                ORDER BY ass.created DESC 
+                ORDER BY ass.created DESC
                 LIMIT 1
             ),
             'goal', (
-                SELECT cgp.goal 
-                FROM common_groupingparameter cgp 
-                WHERE cgp.grade_id = g.grade_id 
+                SELECT cgp.goal
+                FROM common_groupingparameter cgp
+                WHERE cgp.grade_id = g.grade_id
                 AND cgp.level_id = g.level_id
                 AND cgp.language_id = '" . $langId . "'
                 AND (
                     (
                         cgp.benchmark_template_id = (
-                            SELECT id FROM benchmark_templates 
+                            SELECT id FROM benchmark_templates
                             WHERE organisation_ids @> jsonb_build_array(g.organisation_id::text)
                             AND language_ids @> jsonb_build_array('" . $langId . "'::text)
                             LIMIT 1
@@ -1321,7 +1347,7 @@ class User extends Controller
                     )
                     OR (
                         cgp.benchmark_template_id = (
-                            SELECT id FROM benchmark_templates 
+                            SELECT id FROM benchmark_templates
                             WHERE organisation_ids @> jsonb_build_array(g.organisation_id::text)
                             AND language_ids @> jsonb_build_array('" . $langId . "'::text)
                             LIMIT 1
@@ -1333,10 +1359,10 @@ class User extends Controller
                         AND cgp.assessment_period IS NULL
                     )
                 )
-                ORDER BY 
+                ORDER BY
                     (
                         cgp.benchmark_template_id = (
-                            SELECT id FROM benchmark_templates 
+                            SELECT id FROM benchmark_templates
                             WHERE organisation_ids @> jsonb_build_array(g.organisation_id::text)
                             AND language_ids @> jsonb_build_array('" . $langId . "'::text)
                             LIMIT 1
@@ -1355,7 +1381,7 @@ class User extends Controller
                     ) DESC,
                     (
                         cgp.benchmark_template_id = (
-                            SELECT id FROM benchmark_templates 
+                            SELECT id FROM benchmark_templates
                             WHERE organisation_ids @> jsonb_build_array(g.organisation_id::text)
                             AND language_ids @> jsonb_build_array('" . $langId . "'::text)
                             LIMIT 1
@@ -1369,7 +1395,7 @@ class User extends Controller
                 LIMIT 1
             ),
             'current_average', (
-                SELECT AVG(ass.last_word_index + 1 - ass.no_error_words) 
+                SELECT AVG(ass.last_word_index + 1 - ass.no_error_words)
                 FROM assessment_assessment ass
                 JOIN passage_passage pp ON ass.passage_id = pp.id
                 JOIN access_student asst ON ass.student_id = asst.id
@@ -1784,7 +1810,7 @@ class User extends Controller
                 // Match Python logic: students in this group
                 $studentsCountQuery = DB::table('access_student')
                     ->where('access_student.' . $groupColumn, $group->id);
-                    
+
                 if ($languageId) {
                     $studentsCountQuery->join('access_student_languages as sl', 'access_student.id', '=', 'sl.student_id')
                         ->where('sl.language_id', $languageId);
