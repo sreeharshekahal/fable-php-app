@@ -250,6 +250,9 @@ class UserController extends Controller
             $usersQuery = $studentsQuery->union($teachersQuery);
         }
 
+        // Wrap as subquery so ordering/count/skip/take on UNIONs work cleanly without SQL syntax errors
+        $usersQuery = DB::table($usersQuery, 'users');
+
         $hasExplicitOrdering = $request->has('ordering');
 
         // Ordering
