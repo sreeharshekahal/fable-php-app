@@ -253,29 +253,16 @@ class StudentController extends Controller
             $item->is_assessed = (bool) $item->is_assessed;
             $item->last_assessment_time = $item->last_assessment_time ? $this->formatAssessmentTime($item->last_assessment_time) : null;
 
-            $decryptIfNeeded = function ($value) use (&$decryptIfNeeded) {
-                if (empty($value) || !is_string($value)) {
-                    return $value;
+            try {
+                if (!empty($item->user_detail['first_name']) && str_contains($item->user_detail['first_name'], 'eyJpdiI6')) {
+                    $item->user_detail['first_name'] = Crypt::decryptString($item->user_detail['first_name']);
                 }
-                if (str_contains($value, 'eyJpdiI6') || strlen($value) > 40) {
-                    try {
-                        $decrypted = Crypt::decryptString($value);
-                        // Handle double-encrypted values if present
-                        if ($decrypted !== $value && (str_contains($decrypted, 'eyJpdiI6') || strlen($decrypted) > 40)) {
-                            return $decryptIfNeeded($decrypted);
-                        }
-                        return $decrypted;
-                    } catch (\Exception $e) {
-                        Log::error('Error decrypting user detail value: ' . $e->getMessage());
-                    }
+                if (!empty($item->user_detail['last_name']) && str_contains($item->user_detail['last_name'], 'eyJpdiI6')) {
+                    $item->user_detail['last_name'] = Crypt::decryptString($item->user_detail['last_name']);
                 }
-                return $value;
-            };
-
-            if (is_array($item->user_detail)) {
-                $item->user_detail['first_name'] = $decryptIfNeeded($firstName);
-                $item->user_detail['last_name']  = $decryptIfNeeded($lastName);
-                $item->user_detail['full_name']  = trim(($item->user_detail['first_name'] ?? '') . ' ' . ($item->user_detail['last_name'] ?? ''));
+                $item->user_detail['full_name'] = trim(($item->user_detail['first_name'] ?? '') . ' ' . ($item->user_detail['last_name'] ?? ''));
+            } catch (\Exception $e) {
+                Log::error('Error decrypting user details: ' . $e->getMessage());
             }
 
             $item->benchmark_template_id = BenchmarkTemplate::findTemplateId($item->organisation, $langId);
