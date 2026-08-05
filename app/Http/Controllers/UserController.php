@@ -283,45 +283,74 @@ class UserController extends Controller
         $needsInMemoryProcessing = (!empty($search) || ($hasExplicitOrdering && in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title'])));
 
         if ($needsInMemoryProcessing) {
-            $allCandidates = $usersQuery->get(); // Get all matching org/role
+            $searchLower = $search ? strtolower($search) : null;
+            $isExplicitInMemorySort = ($hasExplicitOrdering && in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title']));
+            $targetRequiredCount = $offset + $limit + 1;
 
-            $processed = $allCandidates->map(function ($user) {
+            $matchedCandidates = collect();
+            $scannedCount = 0;
+            $maxScanLimit = $isExplicitInMemorySort ? 5000 : 2500; // Safety cap to avoid 504 gateway timeout on huge DBs
+
+            foreach ($usersQuery->cursor() as $user) {
+                $scannedCount++;
+
                 try {
-                    $user->first_name_decrypted = Crypt::decryptString($user->first_name);
+                    $firstNameDecrypted = Crypt::decryptString($user->first_name);
                 } catch (\Exception $e) {
-                    $user->first_name_decrypted = $user->first_name;
+                    $firstNameDecrypted = $user->first_name;
                 }
 
                 try {
-                    $user->last_name_decrypted = Crypt::decryptString($user->last_name);
+                    $lastNameDecrypted = Crypt::decryptString($user->last_name);
                 } catch (\Exception $e) {
-                    $user->last_name_decrypted = $user->last_name;
+                    $lastNameDecrypted = $user->last_name;
                 }
 
-                return $user;
-            });
+                $user->first_name_decrypted = $firstNameDecrypted;
+                $user->last_name_decrypted = $lastNameDecrypted;
 
-            // Filter by Search
-            if ($search) {
-                $searchLower = strtolower($search);
-                $processed = $processed->filter(function ($user) use ($searchLower) {
-                    return str_contains(strtolower($user->first_name_decrypted), $searchLower) ||
-                        str_contains(strtolower($user->last_name_decrypted), $searchLower);
-                });
+                if ($searchLower) {
+                    $isMatch = str_contains(strtolower($firstNameDecrypted), $searchLower) ||
+                        str_contains(strtolower($lastNameDecrypted), $searchLower) ||
+                        ($user->username && str_contains(strtolower($user->username), $searchLower)) ||
+                        ($user->email && str_contains(strtolower($user->email), $searchLower));
+
+                    if (!$isMatch) {
+                        if ($scannedCount >= $maxScanLimit) {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+
+                $matchedCandidates->push($user);
+
+                // Early exit: Stop streaming as soon as we have enough matches for this page + next link
+                if (!$isExplicitInMemorySort && $matchedCandidates->count() >= $targetRequiredCount) {
+                    break;
+                }
+
+                if ($scannedCount >= $maxScanLimit) {
+                    break;
+                }
             }
 
-            // Sort by requested field (Lexicographical Sort to match Python default)
-            $isDescending = ($direction === 'desc');
-            $sortFlags = SORT_STRING; // Python default is case-sensitive lexicographical
+            $processed = $matchedCandidates;
 
-            if ($ordering === 'first_name') {
-                $processed = $processed->sortBy('first_name_decrypted', $sortFlags, $isDescending);
-            } elseif ($ordering === 'last_name') {
-                $processed = $processed->sortBy('last_name_decrypted', $sortFlags, $isDescending);
-            } elseif ($ordering === 'username') {
-                $processed = $processed->sortBy('username', $sortFlags, $isDescending);
-            } elseif ($ordering === 'group_title' || $ordering === 'title') {
-                $processed = $processed->sortBy('group_title', $sortFlags, $isDescending);
+            // Sort by requested field (Lexicographical Sort to match Python default)
+            if ($isExplicitInMemorySort) {
+                $isDescending = ($direction === 'desc');
+                $sortFlags = SORT_STRING; // Python default is case-sensitive lexicographical
+
+                if ($ordering === 'first_name') {
+                    $processed = $processed->sortBy('first_name_decrypted', $sortFlags, $isDescending);
+                } elseif ($ordering === 'last_name') {
+                    $processed = $processed->sortBy('last_name_decrypted', $sortFlags, $isDescending);
+                } elseif ($ordering === 'username') {
+                    $processed = $processed->sortBy('username', $sortFlags, $isDescending);
+                } elseif ($ordering === 'group_title' || $ordering === 'title') {
+                    $processed = $processed->sortBy('group_title', $sortFlags, $isDescending);
+                }
             }
 
             $totalCount = $processed->count();
