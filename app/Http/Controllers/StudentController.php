@@ -253,14 +253,18 @@ class StudentController extends Controller
             $item->is_assessed = (bool) $item->is_assessed;
             $item->last_assessment_time = $item->last_assessment_time ? $this->formatAssessmentTime($item->last_assessment_time) : null;
 
-            $firstName = $item->user_detail['first_name'] ?? '';
-            $lastName  = $item->user_detail['last_name'] ?? '';
-
-            // Helper for robust decryption attempt
-            $decryptIfNeeded = function ($value) {
-                if (!empty($value) && (str_contains($value, 'eyJpdiI6') || strlen($value) > 40)) {
+            $decryptIfNeeded = function ($value) use (&$decryptIfNeeded) {
+                if (empty($value) || !is_string($value)) {
+                    return $value;
+                }
+                if (str_contains($value, 'eyJpdiI6') || strlen($value) > 40) {
                     try {
-                        return Crypt::decryptString($value);
+                        $decrypted = Crypt::decryptString($value);
+                        // Handle double-encrypted values if present
+                        if ($decrypted !== $value && (str_contains($decrypted, 'eyJpdiI6') || strlen($decrypted) > 40)) {
+                            return $decryptIfNeeded($decrypted);
+                        }
+                        return $decrypted;
                     } catch (\Exception $e) {
                         Log::error('Error decrypting user detail value: ' . $e->getMessage());
                     }
