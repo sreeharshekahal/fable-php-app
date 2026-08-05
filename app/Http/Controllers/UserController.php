@@ -250,6 +250,8 @@ class UserController extends Controller
             $usersQuery = $studentsQuery->union($teachersQuery);
         }
 
+        $hasExplicitOrdering = $request->has('ordering');
+
         // Ordering
         $direction = 'asc';
         if ($ordering) {
@@ -266,16 +268,16 @@ class UserController extends Controller
             } elseif (in_array($ordering, $validSql)) {
                 $usersQuery->orderBy($ordering, $direction);
             } else {
-                // If it's 'asc', 'desc' or invalid, default to first_name (in-memory)
-                $ordering = 'first_name';
+                $usersQuery->orderBy('user_id', 'asc');
+                $ordering = 'user_id';
             }
         } else {
-            // Default ordering
-            $ordering = 'first_name';
+            // Default ordering by user_id in SQL for high-performance SQL pagination
+            $usersQuery->orderBy('user_id', 'asc');
         }
 
         // In-memory processing for encrypted search/sort or natural sort requirements.
-        $needsInMemoryProcessing = ($search || (in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title'])));
+        $needsInMemoryProcessing = (!empty($search) || ($hasExplicitOrdering && in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title'])));
 
         if ($needsInMemoryProcessing) {
             $allCandidates = $usersQuery->get(); // Get all matching org/role
