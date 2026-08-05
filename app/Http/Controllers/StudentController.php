@@ -234,8 +234,8 @@ class StudentController extends Controller
         if ($teacher_id && !empty($teacherDivisions)) {
             $query->where(function ($q) use ($teacherDivisions) {
                 $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                  ->orWhereNull('s.division')
-                  ->orWhere('s.division', '');
+                    ->orWhereNull('s.division')
+                    ->orWhere('s.division', '');
             });
         }
 
@@ -253,22 +253,32 @@ class StudentController extends Controller
             $item->is_assessed = (bool) $item->is_assessed;
             $item->last_assessment_time = $item->last_assessment_time ? $this->formatAssessmentTime($item->last_assessment_time) : null;
 
-            try {
-                if (!empty($item->user_detail['first_name']) && str_contains($item->user_detail['first_name'], 'eyJpdiI6')) {
-                    $item->user_detail['first_name'] = Crypt::decryptString($item->user_detail['first_name']);
+            $firstName = $item->user_detail['first_name'] ?? '';
+            $lastName  = $item->user_detail['last_name'] ?? '';
+
+            // Helper for robust decryption attempt
+            $decryptIfNeeded = function ($value) {
+                if (!empty($value) && (str_contains($value, 'eyJpdiI6') || strlen($value) > 40)) {
+                    try {
+                        return Crypt::decryptString($value);
+                    } catch (\Exception $e) {
+                        Log::error('Error decrypting user detail value: ' . $e->getMessage());
+                    }
                 }
-                if (!empty($item->user_detail['last_name']) && str_contains($item->user_detail['last_name'], 'eyJpdiI6')) {
-                    $item->user_detail['last_name'] = Crypt::decryptString($item->user_detail['last_name']);
-                }
-                $item->user_detail['full_name'] = trim(($item->user_detail['first_name'] ?? '') . ' ' . ($item->user_detail['last_name'] ?? ''));
-            } catch (\Exception $e) {
-                Log::error('Error decrypting user details: ' . $e->getMessage());
+                return $value;
+            };
+
+            if (is_array($item->user_detail)) {
+                $item->user_detail['first_name'] = $decryptIfNeeded($firstName);
+                $item->user_detail['last_name']  = $decryptIfNeeded($lastName);
+                $item->user_detail['full_name']  = trim(($item->user_detail['first_name'] ?? '') . ' ' . ($item->user_detail['last_name'] ?? ''));
             }
 
             $item->benchmark_template_id = BenchmarkTemplate::findTemplateId($item->organisation, $langId);
 
             return $item;
         };
+
 
         // If search is present, fetch all results and filter them
         if ($search) {
@@ -377,8 +387,8 @@ class StudentController extends Controller
             if ($teacher_id && !empty($teacherDivisions)) {
                 $totalCountQuery->where(function ($q) use ($teacherDivisions) {
                     $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                      ->orWhereNull('s.division')
-                      ->orWhere('s.division', '');
+                        ->orWhereNull('s.division')
+                        ->orWhere('s.division', '');
                 });
             }
 
@@ -427,8 +437,8 @@ class StudentController extends Controller
                 if ($teacher_id && !empty($teacherDivisions)) {
                     $scQuery->where(function ($q) use ($teacherDivisions) {
                         $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                          ->orWhereNull('s.division')
-                          ->orWhere('s.division', '');
+                            ->orWhereNull('s.division')
+                            ->orWhere('s.division', '');
                     });
                 }
 
@@ -465,8 +475,8 @@ class StudentController extends Controller
                 if ($teacher_id && !empty($teacherDivisions)) {
                     $avgQuery->where(function ($q) use ($teacherDivisions) {
                         $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                          ->orWhereNull('s.division')
-                          ->orWhere('s.division', '');
+                            ->orWhereNull('s.division')
+                            ->orWhere('s.division', '');
                     });
                 }
 
@@ -507,8 +517,8 @@ class StudentController extends Controller
                 if ($teacher_id && !empty($teacherDivisions)) {
                     $ltQuery->where(function ($q) use ($teacherDivisions) {
                         $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                          ->orWhereNull('s.division')
-                          ->orWhere('s.division', '');
+                            ->orWhereNull('s.division')
+                            ->orWhere('s.division', '');
                     });
                 }
 
@@ -528,7 +538,7 @@ class StudentController extends Controller
                     'organisation'         => $group->organisation_id,
                     'grade'                => $group->grade_id,
                     'level'                => $group->level_id,
-                    'benchmark_template_id'=> $benchmarkTemplateId,
+                    'benchmark_template_id' => $benchmarkTemplateId,
                 ];
             }
         }
