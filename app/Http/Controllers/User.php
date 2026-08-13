@@ -920,13 +920,9 @@ class User extends Controller
             hash_pbkdf2('sha256', $password, $salt, $iterations, 32, true)
         );
 
-        $firstName = $request->filled('first_name')
-            ? Crypt::encryptString($request->first_name)
-            : null;
-
-        $lastName = $request->filled('last_name')
-            ? Crypt::encryptString($request->last_name)
-            : null;
+        // Encrypt first_name and last_name
+        $firstName = \Illuminate\Support\Facades\Crypt::encryptString($request->first_name);
+        $lastName = \Illuminate\Support\Facades\Crypt::encryptString($request->last_name);
 
         $user = \App\Models\User::create([
             'first_name' => $firstName,
@@ -1015,10 +1011,6 @@ class User extends Controller
             ->where('title', 'Benchmarking')
             ->first();
 
-        if (!$level) {
-            return response()->json(['message' => 'Benchmarking level not found'], 404);
-        }
-
         $group = DB::table('organisation_group')
             ->where('organisation_id', $request->organisation)
             ->where('grade_id', $request->grade)
@@ -1077,12 +1069,8 @@ class User extends Controller
 
         $student->update($updateData);
 
-        // Parse input languages from request - the frontend sends a string or an array, supports both
-        $languages = $request->input('languages', []);
-
-        $requestedLanguages = is_array($languages)
-            ? array_map('trim', $languages)
-            : array_map('trim', explode(',', $languages));
+        // Parse input languages from request
+        $requestedLanguages = array_map('trim', explode(',', $request->languages));
 
         // Get language IDs for input names
         $requestedLanguageIds = DB::table('common_language')
@@ -1122,7 +1110,7 @@ class User extends Controller
 
         $user_id = $student->user_id;
 
-        // Update Student First Name and Last Name
+        // Encrypt & Update Student first_name and last_name
         $userUpdate = [];
 
         if ($request->filled('first_name')) {
@@ -1252,8 +1240,6 @@ class User extends Controller
                 $orderColumn = 'u.id';
             } elseif ($ordering === 'username') {
                 $orderColumn = 'u.username';
-            } elseif ($ordering === 'first_name') {
-                $orderColumn = 'u.first_name';
             }
         }
 

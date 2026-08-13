@@ -250,11 +250,6 @@ class UserController extends Controller
             $usersQuery = $studentsQuery->union($teachersQuery);
         }
 
-        // Wrap as subquery so ordering/count/skip/take on UNIONs work cleanly without SQL syntax errors
-        $usersQuery = DB::table($usersQuery, 'users');
-
-        $hasExplicitOrdering = $request->has('ordering');
-
         // Ordering
         $direction = 'asc';
         if ($ordering) {
@@ -271,86 +266,57 @@ class UserController extends Controller
             } elseif (in_array($ordering, $validSql)) {
                 $usersQuery->orderBy($ordering, $direction);
             } else {
-                $usersQuery->orderBy('user_id', 'asc');
-                $ordering = 'user_id';
+                // If it's 'asc', 'desc' or invalid, default to first_name (in-memory)
+                $ordering = 'first_name';
             }
         } else {
-            // Default ordering by user_id in SQL for high-performance SQL pagination
-            $usersQuery->orderBy('user_id', 'asc');
+            // Default ordering
+            $ordering = 'first_name';
         }
 
         // In-memory processing for encrypted search/sort or natural sort requirements.
-        $needsInMemoryProcessing = (!empty($search) || ($hasExplicitOrdering && in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title'])));
+        $needsInMemoryProcessing = ($search || (in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title'])));
 
         if ($needsInMemoryProcessing) {
-            $searchLower = $search ? strtolower($search) : null;
-            $isExplicitInMemorySort = ($hasExplicitOrdering && in_array($ordering, ['first_name', 'last_name', 'username', 'group_title', 'title']));
-            $targetRequiredCount = $offset + $limit + 1;
+            $allCandidates = $usersQuery->get(); // Get all matching org/role
 
-            $matchedCandidates = collect();
-            $scannedCount = 0;
-            $maxScanLimit = $isExplicitInMemorySort ? 5000 : 2500; // Safety cap to avoid 504 gateway timeout on huge DBs
-
-            foreach ($usersQuery->cursor() as $user) {
-                $scannedCount++;
-
+            $processed = $allCandidates->map(function ($user) {
                 try {
-                    $firstNameDecrypted = Crypt::decryptString($user->first_name);
+                    $user->first_name_decrypted = Crypt::decryptString($user->first_name);
                 } catch (\Exception $e) {
-                    $firstNameDecrypted = $user->first_name;
+                    $user->first_name_decrypted = $user->first_name;
                 }
 
                 try {
-                    $lastNameDecrypted = Crypt::decryptString($user->last_name);
+                    $user->last_name_decrypted = Crypt::decryptString($user->last_name);
                 } catch (\Exception $e) {
-                    $lastNameDecrypted = $user->last_name;
+                    $user->last_name_decrypted = $user->last_name;
                 }
 
-                $user->first_name_decrypted = $firstNameDecrypted;
-                $user->last_name_decrypted = $lastNameDecrypted;
+                return $user;
+            });
 
-                if ($searchLower) {
-                    $isMatch = str_contains(strtolower($firstNameDecrypted), $searchLower) ||
-                        str_contains(strtolower($lastNameDecrypted), $searchLower) ||
-                        ($user->username && str_contains(strtolower($user->username), $searchLower)) ||
-                        ($user->email && str_contains(strtolower($user->email), $searchLower));
-
-                    if (!$isMatch) {
-                        if ($scannedCount >= $maxScanLimit) {
-                            break;
-                        }
-                        continue;
-                    }
-                }
-
-                $matchedCandidates->push($user);
-
-                // Early exit: Stop streaming as soon as we have enough matches for this page + next link
-                if (!$isExplicitInMemorySort && $matchedCandidates->count() >= $targetRequiredCount) {
-                    break;
-                }
-
-                if ($scannedCount >= $maxScanLimit) {
-                    break;
-                }
+            // Filter by Search
+            if ($search) {
+                $searchLower = strtolower($search);
+                $processed = $processed->filter(function ($user) use ($searchLower) {
+                    return str_contains(strtolower($user->first_name_decrypted), $searchLower) ||
+                        str_contains(strtolower($user->last_name_decrypted), $searchLower);
+                });
             }
 
-            $processed = $matchedCandidates;
-
             // Sort by requested field (Lexicographical Sort to match Python default)
-            if ($isExplicitInMemorySort) {
-                $isDescending = ($direction === 'desc');
-                $sortFlags = SORT_STRING; // Python default is case-sensitive lexicographical
+            $isDescending = ($direction === 'desc');
+            $sortFlags = SORT_STRING; // Python default is case-sensitive lexicographical
 
-                if ($ordering === 'first_name') {
-                    $processed = $processed->sortBy('first_name_decrypted', $sortFlags, $isDescending);
-                } elseif ($ordering === 'last_name') {
-                    $processed = $processed->sortBy('last_name_decrypted', $sortFlags, $isDescending);
-                } elseif ($ordering === 'username') {
-                    $processed = $processed->sortBy('username', $sortFlags, $isDescending);
-                } elseif ($ordering === 'group_title' || $ordering === 'title') {
-                    $processed = $processed->sortBy('group_title', $sortFlags, $isDescending);
-                }
+            if ($ordering === 'first_name') {
+                $processed = $processed->sortBy('first_name_decrypted', $sortFlags, $isDescending);
+            } elseif ($ordering === 'last_name') {
+                $processed = $processed->sortBy('last_name_decrypted', $sortFlags, $isDescending);
+            } elseif ($ordering === 'username') {
+                $processed = $processed->sortBy('username', $sortFlags, $isDescending);
+            } elseif ($ordering === 'group_title' || $ordering === 'title') {
+                $processed = $processed->sortBy('group_title', $sortFlags, $isDescending);
             }
 
             $totalCount = $processed->count();

@@ -54,33 +54,30 @@ class StudentController extends Controller
         }
 
 
-        // Dynamic ordering logic
-        $ordering = $request->query('ordering', 'first_name');
-        $orderColumn = 'u.first_name';
+        // Dynamic ordering parameters
+        $orderingParam = $request->query('ordering', 'first_name');
         $orderDirection = 'asc';
+        $sortField = 'first_name';
 
-        if ($ordering) {
-            if (str_starts_with($ordering, '-')) {
+        if ($orderingParam) {
+            if (str_starts_with($orderingParam, '-')) {
                 $orderDirection = 'desc';
-                $ordering = substr($ordering, 1);
+                $sortField = substr($orderingParam, 1);
             } else {
                 $orderDirection = 'asc';
-            }
-
-            if ($ordering === 'created_at' || $ordering === 'date_joined') {
-                $orderColumn = 'u.date_joined';
-            } elseif ($ordering === 'id') {
-                $orderColumn = 'u.id';
-            } elseif ($ordering === 'username') {
-                $orderColumn = 'u.username';
-            } elseif ($ordering === 'first_name') {
-                $orderColumn = 'u.first_name';
-            } elseif ($ordering === 'group_title' || $ordering === 'title') {
-                $orderColumn = 'g.title';
+                $sortField = $orderingParam;
             }
         }
 
-
+        // Determine if sorting is handled in SQL or in PHP memory (for encrypted/custom fields)
+        $isMemorySort = in_array($sortField, ['first_name', 'last_name', 'full_name']);
+        $orderColumn = match ($sortField) {
+            'created_at', 'date_joined' => 'u.date_joined',
+            'id' => 'u.id',
+            'username' => 'u.username',
+            'group_title', 'title' => 'g.title',
+            default => 'u.date_joined',
+        };
 
         $groupColumn = 'group_id';
         if ($lang) {
@@ -116,7 +113,7 @@ class StudentController extends Controller
                     'first_name', u.first_name,
                     'last_name', u.last_name,
                     'role_id', s.id,
-                    'full_name', concat(u.first_name, ' ', u.last_name),
+                    'full_name', '',
                     'email', u.email,
                     'role', 'Student',
                     'organisation', json_build_object(
@@ -234,8 +231,8 @@ class StudentController extends Controller
         if ($teacher_id && !empty($teacherDivisions)) {
             $query->where(function ($q) use ($teacherDivisions) {
                 $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                    ->orWhereNull('s.division')
-                    ->orWhere('s.division', '');
+                  ->orWhereNull('s.division')
+                  ->orWhere('s.division', '');
             });
         }
 
@@ -270,9 +267,8 @@ class StudentController extends Controller
             return $item;
         };
 
-
-        // If search is present, fetch all results and filter them
-        if ($search) {
+        // If search or memory sorting is required, fetch all candidates & filter/sort in memory
+        if ($search || $isMemorySort) {
             $allResults = $query->when($orderColumn === 'g.title', function ($q) use ($orderDirection) {
                 $q->orderBy(DB::raw('LENGTH(g.title)'), $orderDirection);
             })
@@ -280,13 +276,29 @@ class StudentController extends Controller
                 ->get()
                 ->map($mapper);
 
-            $searchLower = strtolower($search);
-            $filteredResults = $allResults->filter(function ($item) use ($searchLower) {
-                return str_contains(strtolower($item->user_detail['first_name'] ?? ''), $searchLower) ||
-                    str_contains(strtolower($item->user_detail['last_name'] ?? ''), $searchLower) ||
-                    str_contains(strtolower($item->user_detail['full_name'] ?? ''), $searchLower) ||
-                    str_contains(strtolower($item->user_detail['username'] ?? ''), $searchLower);
-            });
+            $filteredResults = $allResults;
+
+            if ($search) {
+                $searchLower = strtolower($search);
+                $filteredResults = $filteredResults->filter(function ($item) use ($searchLower) {
+                    return str_contains(strtolower($item->user_detail['first_name'] ?? ''), $searchLower) ||
+                        str_contains(strtolower($item->user_detail['last_name'] ?? ''), $searchLower) ||
+                        str_contains(strtolower($item->user_detail['full_name'] ?? ''), $searchLower) ||
+                        str_contains(strtolower($item->user_detail['username'] ?? ''), $searchLower);
+                });
+            }
+
+            if ($isMemorySort) {
+                $sortKey = match ($sortField) {
+                    'last_name' => fn($item) => strtolower($item->user_detail['last_name'] ?? ''),
+                    'full_name' => fn($item) => strtolower($item->user_detail['full_name'] ?? ''),
+                    default => fn($item) => strtolower($item->user_detail['first_name'] ?? ''),
+                };
+
+                $filteredResults = ($orderDirection === 'desc')
+                    ? $filteredResults->sortByDesc($sortKey)
+                    : $filteredResults->sortBy($sortKey);
+            }
 
             $total = $filteredResults->count();
             $results = $filteredResults->slice($offset, $limit)->values();
@@ -378,8 +390,8 @@ class StudentController extends Controller
             if ($teacher_id && !empty($teacherDivisions)) {
                 $totalCountQuery->where(function ($q) use ($teacherDivisions) {
                     $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                        ->orWhereNull('s.division')
-                        ->orWhere('s.division', '');
+                      ->orWhereNull('s.division')
+                      ->orWhere('s.division', '');
                 });
             }
 
@@ -428,8 +440,8 @@ class StudentController extends Controller
                 if ($teacher_id && !empty($teacherDivisions)) {
                     $scQuery->where(function ($q) use ($teacherDivisions) {
                         $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                            ->orWhereNull('s.division')
-                            ->orWhere('s.division', '');
+                          ->orWhereNull('s.division')
+                          ->orWhere('s.division', '');
                     });
                 }
 
@@ -466,8 +478,8 @@ class StudentController extends Controller
                 if ($teacher_id && !empty($teacherDivisions)) {
                     $avgQuery->where(function ($q) use ($teacherDivisions) {
                         $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                            ->orWhereNull('s.division')
-                            ->orWhere('s.division', '');
+                          ->orWhereNull('s.division')
+                          ->orWhere('s.division', '');
                     });
                 }
 
@@ -508,8 +520,8 @@ class StudentController extends Controller
                 if ($teacher_id && !empty($teacherDivisions)) {
                     $ltQuery->where(function ($q) use ($teacherDivisions) {
                         $q->whereIn(DB::raw('UPPER(s.division)'), $teacherDivisions)
-                            ->orWhereNull('s.division')
-                            ->orWhere('s.division', '');
+                          ->orWhereNull('s.division')
+                          ->orWhere('s.division', '');
                     });
                 }
 
@@ -529,7 +541,7 @@ class StudentController extends Controller
                     'organisation'         => $group->organisation_id,
                     'grade'                => $group->grade_id,
                     'level'                => $group->level_id,
-                    'benchmark_template_id' => $benchmarkTemplateId,
+                    'benchmark_template_id'=> $benchmarkTemplateId,
                 ];
             }
         }

@@ -24,8 +24,8 @@ class StudentImport implements ToCollection, WithHeadingRow
     public function collection(Collection $rows)
     {
         foreach ($rows as $index => $row) {
-            // Skip completely empty rows
-            if (!$row['first_name']) {
+            // Skip completely empty rows or rows without first_name
+            if (!isset($row['first_name']) || empty(trim($row['first_name']))) {
                 continue;
             }
 
@@ -49,7 +49,7 @@ class StudentImport implements ToCollection, WithHeadingRow
         $group_id = $group ? $group->id : null;
 
         foreach ($rows as $row) {
-            if (!$row['first_name'])
+            if (!isset($row['first_name']) || empty(trim($row['first_name'])))
                 continue; // basic row validation
 
             if (is_numeric($row['date_of_birth'])) {
