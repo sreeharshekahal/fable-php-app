@@ -281,15 +281,23 @@ class UserController extends Controller
             $allCandidates = $usersQuery->get(); // Get all matching org/role
 
             $processed = $allCandidates->map(function ($user) {
-                try {
-                    $user->first_name_decrypted = Crypt::decryptString($user->first_name);
-                } catch (\Exception $e) {
+                if ($user->first_name && str_contains($user->first_name, 'eyJpdiI6')) {
+                    try {
+                        $user->first_name_decrypted = Crypt::decryptString($user->first_name);
+                    } catch (\Exception $e) {
+                        $user->first_name_decrypted = $user->first_name;
+                    }
+                } else {
                     $user->first_name_decrypted = $user->first_name;
                 }
 
-                try {
-                    $user->last_name_decrypted = Crypt::decryptString($user->last_name);
-                } catch (\Exception $e) {
+                if ($user->last_name && str_contains($user->last_name, 'eyJpdiI6')) {
+                    try {
+                        $user->last_name_decrypted = Crypt::decryptString($user->last_name);
+                    } catch (\Exception $e) {
+                        $user->last_name_decrypted = $user->last_name;
+                    }
+                } else {
                     $user->last_name_decrypted = $user->last_name;
                 }
 
@@ -391,15 +399,23 @@ class UserController extends Controller
             $usersQuery->skip($offset)->take($limit);
 
             $results = $usersQuery->get()->map(function ($user) {
-                try {
-                    $firstName = Crypt::decryptString($user->first_name);
-                } catch (\Exception $e) {
+                if ($user->first_name && str_contains($user->first_name, 'eyJpdiI6')) {
+                    try {
+                        $firstName = Crypt::decryptString($user->first_name);
+                    } catch (\Exception $e) {
+                        $firstName = $user->first_name;
+                    }
+                } else {
                     $firstName = $user->first_name;
                 }
 
-                try {
-                    $lastName = Crypt::decryptString($user->last_name);
-                } catch (\Exception $e) {
+                if ($user->last_name && str_contains($user->last_name, 'eyJpdiI6')) {
+                    try {
+                        $lastName = Crypt::decryptString($user->last_name);
+                    } catch (\Exception $e) {
+                        $lastName = $user->last_name;
+                    }
+                } else {
                     $lastName = $user->last_name;
                 }
 

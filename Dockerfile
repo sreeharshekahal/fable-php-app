@@ -17,4 +17,8 @@ ENV LOG_CHANNEL stderr
 # Allow composer to run as root
 ENV COMPOSER_ALLOW_SUPERUSER 1
 
+# Ensure storage directory is writable
+RUN chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
+
 CMD ["/start.sh"]
+
