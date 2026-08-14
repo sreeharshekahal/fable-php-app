@@ -614,7 +614,11 @@ class OrganisationController extends Controller
                     'passages' => count($passages),
                     'checklist_fluency' => count($checklistFluency),
                     'checklist_retell' => count($checklistRetell),
-                    'grades' => count($grades),
+                    'grades' => [
+                        'Marathi' => count($finalData['grades']['Marathi'] ?? []),
+                        'Hindi' => count($finalData['grades']['Hindi'] ?? []),
+                        'English' => count($finalData['grades']['English'] ?? []),
+                    ],
                     'groups' => [
                         'Marathi' => count($finalData['groups']['Marathi'] ?? []),
                         'Hindi' => count($finalData['groups']['Hindi'] ?? []),
