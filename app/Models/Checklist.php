@@ -4,6 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property string $id
+ * @property string $title
+ * @property int $type
+ * @property string $language_id
+ * @property \Carbon\Carbon|string|null $created
+ * @property \Carbon\Carbon|string|null $updated
+ *
+ * @property Language|null $language
+ * @property \Illuminate\Database\Eloquent\Collection|Assessment[] $assessments
+ */
 class Checklist extends Model
 {
     protected $table = 'assessment_checklist';

@@ -4,6 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property string $id
+ * @property string|null $date_of_birth
+ * @property int|null $gender
+ * @property bool|int $is_english_second_language
+ * @property bool|int $disability
+ * @property string|null $division
+ * @property string $user_id
+ * @property string|null $grade_id
+ * @property string|null $organisation_id
+ * @property string|null $picture
+ * @property string|null $group_id
+ * @property string|null $group_hindi_id
+ * @property string|null $group_marathi_id
+ *
+ * @property User|null $user
+ * @property Grade|null $grade
+ * @property OrganisationGroup|null $group
+ * @property OrganisationGroup|null $group_hindi
+ * @property OrganisationGroup|null $group_marathi
+ * @property Organisation|null $organisation
+ * @property \Illuminate\Database\Eloquent\Collection|Language[] $languages
+ */
 class Student extends Model
 {
     protected $table = 'access_student';
