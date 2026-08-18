@@ -16,6 +16,7 @@ use App\Http\Controllers\WordController;
 use App\Http\Controllers\GroupingParameterController;
 use App\Http\Controllers\AccuracyController;
 use App\Http\Controllers\BenchmarkTemplateController;
+use App\Http\Controllers\PassageController;
 
 
 /*
@@ -101,6 +102,8 @@ Route::middleware(['django.auth'])->group(function () {
         Route::put('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'update']);
         Route::delete('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'destroy']);
         Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
+
+        Route::put('/passages/{id}/status', [PassageController::class, 'updateStatus']);
     });
 
     Route::post('/assessments', [AssessmentController::class, 'postAssessments']);

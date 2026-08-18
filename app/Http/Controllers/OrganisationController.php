@@ -28,21 +28,21 @@ class OrganisationController extends Controller
      */
     public function index(Request $request)
     {
-        $user = \auth()->user();
+        $user = auth()->user();
 
         // Filter by language for counts
         $langName = $request->get('language', $request->get('languages__name', 'English'));
 
         $search = $request->get('search');
 
-        $admin = DB::table('access_admin')->where('user_id', \optional($user)->id)->first();
+        $admin = DB::table('access_admin')->where('user_id', optional($user)->id)->first();
 
         if ($admin) {
             $query = Organisation::query();
         } else {
-            $teacher = Teacher::where('user_id', \optional($user)->id)->first();
+            $teacher = Teacher::where('user_id', optional($user)->id)->first();
             if (!$teacher) {
-                return \response()->json([
+                return response()->json([
                     'count' => 0,
                     'next' => null,
                     'previous' => null,
@@ -71,8 +71,8 @@ class OrganisationController extends Controller
         }
 
         $totalCount = $query->count();
-        $limit = (int) $request->input('limit', 50);
-        $offset = (int) $request->input('offset', 0);
+        $limit = $request->input('limit', 50);
+        $offset = $request->input('offset', 0);
 
         $organisations = $query->orderBy('title')
             ->skip($offset)
@@ -83,7 +83,7 @@ class OrganisationController extends Controller
             return $this->formatOrganisation($org, $langName, true);
         });
 
-        return \response()->json([
+        return response()->json([
             'count' => $totalCount,
             'next' => $this->getPaginationLink($request, $totalCount, $limit, $offset, true),
             'previous' => $this->getPaginationLink($request, $totalCount, $limit, $offset, false),
@@ -96,11 +96,11 @@ class OrganisationController extends Controller
      */
     public function store(Request $request)
     {
-        $user = \auth()->user();
+        $user = auth()->user();
         $admin = DB::table('access_admin')->where('user_id', $user->id)->first();
 
         if (!$admin) {
-            return \response()->json(['message' => 'User is not authorized to create an organisation'], 403);
+            return response()->json(['message' => 'User is not authorized to create an organisation'], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -108,7 +108,7 @@ class OrganisationController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return \response()->json([
+            return response()->json([
                 'message' => 'The given data was invalid.',
                 'errors' => $validator->errors()
             ], 422);
@@ -124,8 +124,8 @@ class OrganisationController extends Controller
             'description' => $request->description,
             'help_word_analysis' => $request->help_word_analysis ?? false,
             'created_by_id' => $createdByUuid,
-            'created' => \now(),
-            'updated' => \now(),
+            'created' => now(),
+            'updated' => now(),
         ]);
 
         if ($request->has('languages')) {
@@ -143,7 +143,7 @@ class OrganisationController extends Controller
             }
         }
 
-        return \response()->json($this->formatOrganisation($org, 'English', true), 201);
+        return response()->json($this->formatOrganisation($org, 'English', true), 201);
     }
 
     /**
@@ -180,15 +180,15 @@ class OrganisationController extends Controller
                 return $isArchivedA <=> $isArchivedB;
             }
 
-            $gradeLevelA = \optional($a->grade)->level ?? 0;
-            $gradeLevelB = \optional($b->grade)->level ?? 0;
+            $gradeLevelA = optional($a->grade)->level ?? 0;
+            $gradeLevelB = optional($b->grade)->level ?? 0;
 
             if ($gradeLevelA !== $gradeLevelB) {
                 return $gradeLevelA <=> $gradeLevelB;
             }
 
-            $levelRankA = \optional($a->level)->rank ?? 0;
-            $levelRankB = \optional($b->level)->rank ?? 0;
+            $levelRankA = optional($a->level)->rank ?? 0;
+            $levelRankB = optional($b->level)->rank ?? 0;
 
             if ($levelRankA !== $levelRankB) {
                 return $levelRankA <=> $levelRankB;
@@ -229,7 +229,7 @@ class OrganisationController extends Controller
             'grades' => $data['grades'],
         ];
 
-        return \response()->json($finalResponse);
+        return response()->json($finalResponse);
     }
 
     /**
@@ -249,7 +249,7 @@ class OrganisationController extends Controller
             $org->help_word_analysis = $request->help_word_analysis;
         }
 
-        $org->updated = \now();
+        $org->updated = now();
         $org->save();
 
         if ($request->has('languages')) {
@@ -257,7 +257,7 @@ class OrganisationController extends Controller
             $org->languages()->sync($langIds);
         }
 
-        return \response()->json($this->formatOrganisation($org, 'English', true));
+        return response()->json($this->formatOrganisation($org, 'English', true));
     }
 
     /**
@@ -306,18 +306,13 @@ class OrganisationController extends Controller
             $org->delete();
         });
 
-        return \response()->json("Deleted", 204);
+        return response()->json("Deleted", 204);
     }
 
     /**
      * Helper to format organisation data.
-     *
-     * @param Organisation $org
-     * @param string $langName
-     * @param bool $includeCounts
-     * @return array
      */
-    public function formatOrganisation(Organisation $org, string $langName, bool $includeCounts = false)
+    public function formatOrganisation($org, $langName, $includeCounts = false)
     {
         $language = Language::where('name', 'ILIKE', $langName)->first();
         $languageId = $language ? $language->id : null;
@@ -371,13 +366,8 @@ class OrganisationController extends Controller
 
     /**
      * Helper to format group data (simplified for organisation details).
-     *
-     * @param OrganisationGroup $group
-     * @param string $langName
-     * @param Request $request
-     * @return array
      */
-    protected function formatGroup(OrganisationGroup $group, string $langName, Request $request)
+    protected function formatGroup($group, $langName, $request)
     {
         $language = Language::where('name', 'ILIKE', $langName)->first();
         $languageId = $language ? $language->id : null;
@@ -444,14 +434,7 @@ class OrganisationController extends Controller
         ];
     }
 
-    /**
-     * Translate group title according to language name.
-     *
-     * @param string $title
-     * @param string $langName
-     * @return string
-     */
-    protected function translateGroupTitle(string $title, string $langName)
+    protected function translateGroupTitle($title, $langName)
     {
         $langName = ucfirst(strtolower($langName));
         if ($langName === 'English') {
@@ -475,7 +458,7 @@ class OrganisationController extends Controller
      */
     public function offlineData(Request $request)
     {
-        $user = \auth()->user();
+        $user = auth()->user();
 
         // Match user requirement: if no teacher_id received, fetch from parameter
         $teacherId = $request->get('teacher_id') ?: $request->get('teacher');
@@ -483,22 +466,22 @@ class OrganisationController extends Controller
         if ($teacherId) {
             $teacher = Teacher::find($teacherId);
         } else {
-            $teacher = Teacher::where('user_id', \optional($user)->id)->first();
+            $teacher = Teacher::where('user_id', optional($user)->id)->first();
         }
 
         if (!$teacher) {
-            return \response()->json(['message' => 'Teacher profile not found'], 404);
+            return response()->json(['message' => 'Teacher profile not found'], 404);
         }
 
         $organisation = $teacher->organisation;
         if (!$organisation) {
-            return \response()->json(['message' => 'Organisation not found'], 404);
+            return response()->json(['message' => 'Organisation not found'], 404);
         }
 
         $studentId = $request->get('student'); // Handle student parameter from curl
-        $type = $request->filled('type') ? (int)$request->get('type') : null;
+        $type = $request->filled('type') ? $request->get('type') : null;
 
-        $wordService = \app(WordCategorizationService::class);
+        $wordService = app(WordCategorizationService::class);
         $languages = ['Marathi', 'Hindi', 'English'];
         $langModels = Language::whereIn('name', $languages)->get()->keyBy('name');
 
@@ -512,8 +495,9 @@ class OrganisationController extends Controller
             ->map(fn($s) => $this->formatOfflineStudent($s, $type))
             ->values();
 
-        // 2. Passages (All)
+        // 2. Passages (Active)
         $passages = Passage::with(['language', 'grade'])
+            ->where('passage_passage.status', true)
             ->join('common_grade', 'passage_passage.grade_id', '=', 'common_grade.id')
             ->orderBy('common_grade.level')
             ->orderBy('passage_passage.number')
@@ -571,15 +555,15 @@ class OrganisationController extends Controller
                     return $isArchivedA <=> $isArchivedB;
                 }
 
-                $gradeLevelA = \optional($a->grade)->level ?? 0;
-                $gradeLevelB = \optional($b->grade)->level ?? 0;
+                $gradeLevelA = optional($a->grade)->level ?? 0;
+                $gradeLevelB = optional($b->grade)->level ?? 0;
 
                 if ($gradeLevelA !== $gradeLevelB) {
                     return $gradeLevelA <=> $gradeLevelB;
                 }
 
-                $levelRankA = \optional($a->level)->rank ?? 0;
-                $levelRankB = \optional($b->level)->rank ?? 0;
+                $levelRankA = optional($a->level)->rank ?? 0;
+                $levelRankB = optional($b->level)->rank ?? 0;
 
                 if ($levelRankA !== $levelRankB) {
                     return $levelRankA <=> $levelRankB;
@@ -600,48 +584,10 @@ class OrganisationController extends Controller
             })->values()->all();
         }
 
-        // Calculate SHA-256 payload checksum over data object
-        $jsonPayload = json_encode($finalData, JSON_PRESERVE_ZERO_FRACTION);
-        $checksum = hash('sha256', $jsonPayload);
-
-        // Build sync manifest metadata header
-        $metaManifest = [
-            '_meta' => [
-                'checksum' => $checksum,
-                'generated_at' => \now()->toIso8601String(),
-                'counts' => [
-                    'students' => count($students),
-                    'passages' => count($passages),
-                    'checklist_fluency' => count($checklistFluency),
-                    'checklist_retell' => count($checklistRetell),
-                    'grades' => [
-                        'Marathi' => count($finalData['grades']['Marathi'] ?? []),
-                        'Hindi' => count($finalData['grades']['Hindi'] ?? []),
-                        'English' => count($finalData['grades']['English'] ?? []),
-                    ],
-                    'groups' => [
-                        'Marathi' => count($finalData['groups']['Marathi'] ?? []),
-                        'Hindi' => count($finalData['groups']['Hindi'] ?? []),
-                        'English' => count($finalData['groups']['English'] ?? []),
-                    ],
-                ],
-            ]
-        ];
-
-        $responsePayload = array_merge($metaManifest, $finalData);
-
-        return \response()->json($responsePayload, 200, [
-            'ETag' => '"' . $checksum . '"',
-            'X-Checksum' => $checksum,
-        ], JSON_PRESERVE_ZERO_FRACTION);
+        return response()->json($finalData, 200, [], JSON_PRESERVE_ZERO_FRACTION);
     }
 
-    /**
-     * @param Student $student
-     * @param int|null $type
-     * @return array
-     */
-    protected function formatOfflineStudent(Student $student, ?int $type = null)
+    protected function formatOfflineStudent(Student $student, $type = null)
     {
         $firstName = $student->user->first_name;
         $lastName = $student->user->last_name;
@@ -656,14 +602,14 @@ class OrganisationController extends Controller
             $assessmentsQuery->where('type', $type);
         }
 
-        $langName = \request()->get('language', \request()->get('languages__name', 'English'));
+        $langName = request()->get('language', request()->get('languages__name', 'English'));
         $groupDetail = null;
         if (strcasecmp($langName, 'Marathi') === 0 && $student->group_marathi) {
-            $groupDetail = $this->formatGroup($student->group_marathi, $langName, \request());
+            $groupDetail = $this->formatGroup($student->group_marathi, $langName, request());
         } elseif (strcasecmp($langName, 'Hindi') === 0 && $student->group_hindi) {
-            $groupDetail = $this->formatGroup($student->group_hindi, $langName, \request());
+            $groupDetail = $this->formatGroup($student->group_hindi, $langName, request());
         } elseif ($student->group) {
-            $groupDetail = $this->formatGroup($student->group, $langName, \request());
+            $groupDetail = $this->formatGroup($student->group, $langName, request());
         }
 
         return [
@@ -704,14 +650,7 @@ class OrganisationController extends Controller
         ];
     }
 
-    /**
-     * @param Passage $passage
-     * @param WordCategorizationService $wordService
-     * @param string|null $studentId
-     * @param int|null $type
-     * @return array
-     */
-    protected function formatOfflinePassage(Passage $passage, WordCategorizationService $wordService, ?string $studentId = null, ?int $type = null)
+    protected function formatOfflinePassage(Passage $passage, $wordService, $studentId = null, $type = null)
     {
         $langName = $passage->language->name;
         $words = $wordService->getWordsFromPassage($passage->raw_content, $langName);
@@ -748,10 +687,6 @@ class OrganisationController extends Controller
         ];
     }
 
-    /**
-     * @param Checklist $checklist
-     * @return array
-     */
     protected function formatOfflineChecklist(Checklist $checklist)
     {
         return [
@@ -765,25 +700,13 @@ class OrganisationController extends Controller
         ];
     }
 
-    /**
-     * @param \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $assessmentsQuery
-     * @return string|null
-     */
     protected function formatLastAssessmentTime($assessmentsQuery)
     {
         $assessment = (clone $assessmentsQuery)->orderBy('created', 'desc')->first();
         return $assessment ? $this->formatAssessmentTime($assessment->created) : null;
     }
 
-    /**
-     * @param Request $request
-     * @param int $total
-     * @param int $limit
-     * @param int $offset
-     * @param bool $isNext
-     * @return string|null
-     */
-    protected function getPaginationLink(Request $request, int $total, int $limit, int $offset, bool $isNext)
+    protected function getPaginationLink(Request $request, $total, $limit, $offset, $isNext)
     {
         if ($isNext) {
             if ($offset + $limit >= $total) return null;
