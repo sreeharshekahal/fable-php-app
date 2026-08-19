@@ -78,6 +78,9 @@ Route::middleware(['django.auth'])->group(function () {
     Route::get('/words', [WordController::class, 'index']);
     Route::get('/words/{wordId}', [WordController::class, 'show']);
 
+    Route::get('/passages', [PassageController::class, 'index']);
+    Route::get('/passages/{id}', [PassageController::class, 'show']);
+
     Route::middleware(['admin.permission'])->group(function () {
         Route::get('/grouping-parameters', [GroupingParameterController::class, 'index']);
         Route::post('/grouping-parameters', [GroupingParameterController::class, 'store']);
