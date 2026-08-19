@@ -745,6 +745,7 @@ class OrganisationController extends Controller
             'readability_score' => (float) ($passage->readability_score ?? 0),
             'grade' => $passage->grade_id,
             'created_by' => $passage->created_by_id,
+            'status' => $passage->status,
         ];
     }
 
