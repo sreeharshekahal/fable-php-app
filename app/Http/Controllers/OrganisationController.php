@@ -497,7 +497,6 @@ class OrganisationController extends Controller
 
         // 2. Passages (Active)
         $passages = Passage::with(['language', 'grade'])
-            ->where('passage_passage.status', true)
             ->join('common_grade', 'passage_passage.grade_id', '=', 'common_grade.id')
             ->orderBy('common_grade.level')
             ->orderBy('passage_passage.number')
@@ -684,6 +683,7 @@ class OrganisationController extends Controller
             'readability_score' => (float) ($passage->readability_score ?? 0),
             'grade' => $passage->grade_id,
             'created_by' => $passage->created_by_id,
+            'status' => $passage->status,
         ];
     }
 
