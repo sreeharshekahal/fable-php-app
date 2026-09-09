@@ -20,7 +20,7 @@ class EncryptExistingNames extends Command
      *
      * @var string
      */
-    protected $description = 'Encrypt plaintext names in the auth_user table';
+    protected $description = 'Encrypt plaintext names of students in the auth_user table';
 
     /**
      * Execute the console command.
@@ -29,27 +29,40 @@ class EncryptExistingNames extends Command
      */
     public function handle()
     {
-        $users = DB::table('auth_user')->get();
+        $users = DB::table('auth_user')
+            ->whereIn('id', function ($query) {
+                $query->select('user_id')
+                    ->from('access_student')
+                    ->whereNotNull('user_id');
+            })
+            ->get();
         $count = 0;
 
-        $this->info("Found " . count($users) . " users. Checking for plaintext names...");
+        $this->info("Found " . count($users) . " student users. Checking for plaintext names...");
 
         foreach ($users as $user) {
+            $updateData = [];
+
             // Check if name is already encrypted (Laravel encryption starts with 'eyJpdiI6')
             if (!empty($user->first_name) && !str_contains($user->first_name, 'eyJpdiI6')) {
+                $updateData['first_name'] = Crypt::encryptString($user->first_name);
+            }
+
+            if (!empty($user->last_name) && !str_contains($user->last_name, 'eyJpdiI6')) {
+                $updateData['last_name'] = Crypt::encryptString($user->last_name);
+            }
+
+            if (!empty($updateData)) {
                 try {
-                    DB::table('auth_user')->where('id', $user->id)->update([
-                        'first_name' => Crypt::encryptString($user->first_name),
-                        'last_name' => !empty($user->last_name) ? Crypt::encryptString($user->last_name) : '',
-                    ]);
+                    DB::table('auth_user')->where('id', $user->id)->update($updateData);
                     $count++;
                 } catch (\Exception $e) {
-                    $this->error("Failed to encrypt user ID {$user->id}: " . $e->getMessage());
+                    $this->error("Failed to encrypt student user ID {$user->id}: " . $e->getMessage());
                 }
             }
         }
 
-        $this->info("Successfully encrypted $count plaintext names.");
+        $this->info("Successfully encrypted $count student plaintext names.");
         return 0;
     }
 }
