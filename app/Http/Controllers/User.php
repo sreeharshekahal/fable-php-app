@@ -90,34 +90,121 @@ class User extends Controller
 
     public function updateTeacher(Request $request, $id)
     {
-        $teacher = DB::table('access_teacher')->where('id', $id);
+        $teacherQuery = DB::table('access_teacher')->where('id', $id);
+        $teacher = $teacherQuery->first();
 
         if (!$teacher) {
             return response()->json(['message' => 'Teacher not found'], 404);
         }
 
-        $updateData = [
-            'division' => $request->get('division')
-        ];
+        // Update teacher fields
+        $updateData = [];
 
-        $teacher->update($updateData);
+        if ($request->has('division')) {
+            $updateData['division'] = $request->get('division');
+        }
 
-        $user_id = $teacher->first()->user_id;
+        if ($request->has('gender')) {
+            $updateData['gender'] = $request->get('gender');
+        }
 
-        if ($user_id && $request->get('password')) {
-            $password = $request->get('password');
-            $salt = Str::random(12); // You can use random_bytes if you want binary
-            $iterations = 150000;
+        if (!empty($updateData)) {
+            $teacherQuery->update($updateData);
+        }
 
-            // Generate raw binary hash
-            $rawHash = hash_pbkdf2('sha256', $password, $salt, $iterations, 32, true);
+        $user_id = $teacher->user_id;
 
-            // Encode it in base64
-            $base64Hash = base64_encode($rawHash);
+        // Update auth_user fields
+        if ($user_id) {
+            $userData = [];
 
-            // Build final string
-            $hashedPassword = "pbkdf2_sha256\${$iterations}\${$salt}\${$base64Hash}";
-            DB::table('auth_user')->where('id', $user_id)->update(['password' => $hashedPassword]);
+            if ($request->has('first_name')) {
+                $userData['first_name'] = $request->get('first_name');
+            }
+
+            if ($request->has('last_name')) {
+                $userData['last_name'] = $request->get('last_name');
+            }
+
+            if ($request->has('email')) {
+                $userData['email'] = $request->get('email');
+            }
+
+            if ($request->get('password')) {
+                $password = $request->get('password');
+                $salt = Str::random(12); // You can use random_bytes if you want binary
+                $iterations = 150000;
+
+                // Generate raw binary hash
+                $rawHash = hash_pbkdf2('sha256', $password, $salt, $iterations, 32, true);
+                // Encode it in base64
+                $base64Hash = base64_encode($rawHash);
+                // Build final string
+                $hashedPassword = "pbkdf2_sha256\${$iterations}\${$salt}\${$base64Hash}";
+                $userData['password'] = $hashedPassword;
+            }
+
+            if (!empty($userData)) {
+                DB::table('auth_user')
+                    ->where('id', $user_id)
+                    ->update($userData);
+            }
+        }
+
+        // Update languages
+        if ($request->has('language') || $request->has('languages') || $request->has('language_ids')) {
+            $languageInput = $request->input('language', $request->input('languages', $request->input('language_ids')));
+
+            if (is_string($languageInput)) {
+                $decoded = json_decode($languageInput, true);
+                $languageIds = is_array($decoded)
+                    ? $decoded
+                    : array_map('trim', explode(',', $languageInput));
+            } elseif (is_array($languageInput)) {
+                $languageIds = $languageInput;
+            } else {
+                $languageIds = [$languageInput];
+            }
+
+            $languageIds = array_values(array_filter($languageIds));
+
+            $resolvedLanguageIds = [];
+
+            $uuids = array_filter($languageIds, fn($val) => is_string($val) && Str::isUuid($val));
+            $nonUuids = array_filter($languageIds, fn($val) => !is_string($val) || !Str::isUuid($val));
+
+            if (!empty($uuids)) {
+                $validUuids = DB::table('common_language')
+                    ->whereIn('id', $uuids)
+                    ->pluck('id')
+                    ->toArray();
+                $resolvedLanguageIds = array_merge($resolvedLanguageIds, !empty($validUuids) ? $validUuids : $uuids);
+            }
+
+            // Fallback for language names if names are passed
+            if (!empty($nonUuids)) {
+                $nameIds = DB::table('common_language')
+                    ->whereIn(
+                        DB::raw('LOWER(name)'),
+                        array_map('strtolower', array_map('strval', $nonUuids))
+                    )
+                    ->pluck('id')
+                    ->toArray();
+                $resolvedLanguageIds = array_merge($resolvedLanguageIds, !empty($nameIds) ? $nameIds : $nonUuids);
+            }
+
+            // Remove current languages
+            DB::table('access_teacher_languages')
+                ->where('teacher_id', $id)
+                ->delete();
+
+            // Add selected languages
+            foreach (array_unique($resolvedLanguageIds) as $languageId) {
+                DB::table('access_teacher_languages')->insert([
+                    'teacher_id'  => $id,
+                    'language_id' => $languageId,
+                ]);
+            }
         }
 
         return response()->json(['success' => 'Updated successfully'], 200);
