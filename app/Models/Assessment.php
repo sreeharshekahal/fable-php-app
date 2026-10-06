@@ -104,4 +104,14 @@ class Assessment extends Model
             ->using(AssessmentErrorWord::class)
             ->withPivot('index');
     }
+
+    public function getDivisionAttribute()
+    {
+        return $this->student?->division;
+    }
+
+    public function getLanguageAttribute()
+    {
+        return $this->passage?->language?->name;
+    }
 }

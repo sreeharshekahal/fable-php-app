@@ -76,6 +76,7 @@ class AssessmentController extends Controller
             ->leftJoin('access_student as s', 'a.student_id', '=', 's.id')
             ->leftJoin('auth_user as u', 's.user_id', '=', 'u.id')
             ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
+            ->leftJoin('common_language as lang', 'p.language_id', '=', 'lang.id')
             ->leftJoin('access_teacher as t', 'a.conducted_by_id', '=', 't.id')
             ->leftJoin('auth_user as conductor', 't.user_id', '=', 'conductor.id')
             ->leftJoin('organisation_organisation as org', 'a.organisation_id', '=', 'org.id')
@@ -87,9 +88,11 @@ class AssessmentController extends Controller
                 'u.first_name as student_first_name',
                 'u.last_name as student_last_name',
                 's.gender as student_gender',
+                's.division as student_division',
                 'p.passage_name as passage_title',
                 'p.grade_id as passage_grade_id',
                 'p.language_id as passage_language_id',
+                'lang.name as language_name',
                 'p.raw_content',
                 'p.number as passage_no',
                 'pgrade.level as passage_grade_level',
@@ -390,6 +393,8 @@ class AssessmentController extends Controller
                 'checklists_details' => $checklistsDetails,
                 'word_details' => $wordDetails,
                 'assessment_period' => $row->assessment_period,
+                'language' => $row->language_name ?? null,
+                'division' => ($row->student_division !== null && $row->student_division !== '') ? $row->student_division : null,
             ];
         });
 
@@ -418,6 +423,7 @@ class AssessmentController extends Controller
             ->leftJoin('access_student as s', 'a.student_id', '=', 's.id')
             ->leftJoin('auth_user as u', 's.user_id', '=', 'u.id')
             ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
+            ->leftJoin('common_language as lang', 'p.language_id', '=', 'lang.id')
             ->leftJoin('access_teacher as t', 'a.conducted_by_id', '=', 't.id')
             ->leftJoin('auth_user as conductor', 't.user_id', '=', 'conductor.id')
             ->leftJoin('organisation_organisation as org', 'a.organisation_id', '=', 'org.id')
@@ -429,9 +435,11 @@ class AssessmentController extends Controller
                 'u.first_name as student_first_name',
                 'u.last_name as student_last_name',
                 's.gender as student_gender',
+                's.division as student_division',
                 'p.passage_name as passage_title',
                 'p.grade_id as passage_grade_id',
                 'p.language_id as passage_language_id',
+                'lang.name as language_name',
                 'p.number as passage_no',
                 'pgrade.level as passage_grade_level',
                 'grp.title as group_title',
@@ -553,6 +561,8 @@ class AssessmentController extends Controller
             'retell_audio' => $row->retell_audio,
             'assessment_period' => $row->assessment_period,
             'language_id' => $row->passage_language_id,
+            'language' => $row->language_name ?? null,
+            'division' => ($row->student_division !== null && $row->student_division !== '') ? $row->student_division : null,
         ], 200, [], JSON_PRESERVE_ZERO_FRACTION);
     }
 
@@ -857,6 +867,7 @@ class AssessmentController extends Controller
                 'ct.first_name as conductor_first_name',
                 'ct.last_name as conductor_last_name',
                 's.gender as student_gender',
+                's.division as student_division',
                 'a.created',
                 'a.type as assessment_type_code',
                 'p.number as passage_number',
