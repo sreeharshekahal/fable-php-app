@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Models\BenchmarkTemplate;
 
 class TeacherController extends Controller
@@ -147,12 +148,24 @@ class TeacherController extends Controller
         $uniqueGroupIds = array_unique($allGroupIds);
 
         // Language Handling (global for the listing)
-        $langName = $request->get('lang', $request->get('language', $request->get('languages__name', 'English')));
-        $language = DB::table('common_language')->where('name', 'ilike', $langName)->first();
+        $langParam = $request->get('lang', $request->get('language', $request->get('languages__name', 'English')));
+        if (is_array($langParam)) {
+            $langParam = reset($langParam);
+        }
+
+        $language = null;
+        if (!empty($langParam) && is_string($langParam)) {
+            if (Str::isUuid($langParam)) {
+                $language = DB::table('common_language')->where('id', $langParam)->first();
+            } else {
+                $language = DB::table('common_language')->where('name', 'ilike', $langParam)->first();
+            }
+        }
         if (!$language) {
             $language = DB::table('common_language')->where('name', 'ilike', 'English')->first();
         }
         $language_id = $language ? $language->id : null;
+        $langName = $language ? $language->name : 'English';
 
         $groupColumn = 'group_id';
         if (strtolower($langName) === 'hindi') {
@@ -391,12 +404,24 @@ class TeacherController extends Controller
         }
 
         // Language Handling (similar to OrganisationGroupController)
-        $langName = $request->get('lang', $request->get('language', $request->get('languages__name', 'English')));
-        $language = DB::table('common_language')->where('name', 'ilike', $langName)->first();
+        $langParam = $request->get('lang', $request->get('language', $request->get('languages__name', 'English')));
+        if (is_array($langParam)) {
+            $langParam = reset($langParam);
+        }
+
+        $language = null;
+        if (!empty($langParam) && is_string($langParam)) {
+            if (Str::isUuid($langParam)) {
+                $language = DB::table('common_language')->where('id', $langParam)->first();
+            } else {
+                $language = DB::table('common_language')->where('name', 'ilike', $langParam)->first();
+            }
+        }
         if (!$language) {
             $language = DB::table('common_language')->where('name', 'ilike', 'English')->first();
         }
         $language_id = $language ? $language->id : null;
+        $langName = $language ? $language->name : 'English';
 
         $groupColumn = 'group_id';
         if (strtolower($langName) === 'hindi') {
