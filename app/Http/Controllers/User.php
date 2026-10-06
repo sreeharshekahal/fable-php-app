@@ -97,11 +97,21 @@ class User extends Controller
             return response()->json(['message' => 'Teacher not found'], 404);
         }
 
-        // Update teacher fields
+        // Update teacher fields (excluding organisation and type)
         $updateData = [];
 
-        if ($request->has('division')) {
-            $updateData['division'] = $request->get('division');
+        // Multiple divisions support (accepts array or comma-separated string)
+        if ($request->has('division') || $request->has('divisions')) {
+            $divisionInput = $request->input('division', $request->input('divisions'));
+            if (is_array($divisionInput)) {
+                $divList = array_filter(array_map('trim', $divisionInput));
+                $updateData['division'] = !empty($divList) ? implode(',', $divList) : null;
+            } elseif (is_string($divisionInput)) {
+                $divList = array_filter(array_map('trim', explode(',', $divisionInput)));
+                $updateData['division'] = !empty($divList) ? implode(',', $divList) : null;
+            } else {
+                $updateData['division'] = null;
+            }
         }
 
         if ($request->has('gender')) {
@@ -130,8 +140,12 @@ class User extends Controller
                 $userData['email'] = $request->get('email');
             }
 
-            if ($request->get('password')) {
-                $password = $request->get('password');
+            if ($request->has('username')) {
+                $userData['username'] = $request->get('username');
+            }
+
+            if ($request->filled('password')) {
+                $password = $request->input('password');
                 $salt = Str::random(12); // You can use random_bytes if you want binary
                 $iterations = 150000;
 
@@ -151,7 +165,26 @@ class User extends Controller
             }
         }
 
-        // Update languages
+        // Update groups (access_teacher_groups)
+        if ($request->has('groups')) {
+            $groups = $request->get('groups');
+            $groupIds = is_array($groups) ? array_filter($groups) : [];
+
+            // Remove existing groups for this teacher
+            DB::table('access_teacher_groups')
+                ->where('teacher_id', $id)
+                ->delete();
+
+            // Insert new groups
+            foreach ($groupIds as $groupId) {
+                DB::table('access_teacher_groups')->insert([
+                    'teacher_id' => $id,
+                    'group_id'   => $groupId,
+                ]);
+            }
+        }
+
+        // Update languages (access_teacher_languages)
         if ($request->has('language') || $request->has('languages') || $request->has('language_ids')) {
             $languageInput = $request->input('language', $request->input('languages', $request->input('language_ids')));
 

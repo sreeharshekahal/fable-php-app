@@ -165,7 +165,7 @@ class TeacherController extends Controller
             $language = DB::table('common_language')->where('name', 'ilike', 'English')->first();
         }
         $language_id = $language ? $language->id : null;
-        $langName = $language ? $language->name : 'English';
+        $langName = $language ? $language->name : '';
 
         $groupColumn = 'group_id';
         if (strtolower($langName) === 'hindi') {
@@ -421,7 +421,7 @@ class TeacherController extends Controller
             $language = DB::table('common_language')->where('name', 'ilike', 'English')->first();
         }
         $language_id = $language ? $language->id : null;
-        $langName = $language ? $language->name : 'English';
+        $langName = $language ? $language->name : '';
 
         $groupColumn = 'group_id';
         if (strtolower($langName) === 'hindi') {
