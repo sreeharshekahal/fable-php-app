@@ -97,6 +97,44 @@ class User extends Controller
             return response()->json(['message' => 'Teacher not found'], 404);
         }
 
+        $user_id = $teacher->user_id;
+
+        // Check if username already exists for another user
+        if ($request->has('username') && $request->filled('username')) {
+            $username = $request->get('username');
+            $usernameQuery = DB::table('auth_user')
+                ->where(function ($q) use ($username) {
+                    $q->where('username', $username)
+                      ->orWhereRaw('LOWER(username) = ?', [strtolower($username)]);
+                });
+
+            if ($user_id) {
+                $usernameQuery->where('id', '!=', $user_id);
+            }
+
+            if ($usernameQuery->exists()) {
+                return response()->json(['error' => 'Username already exists.'], 409);
+            }
+        }
+
+        // Check if email already exists for another user
+        if ($request->has('email') && $request->filled('email')) {
+            $email = $request->get('email');
+            $emailQuery = DB::table('auth_user')
+                ->where(function ($q) use ($email) {
+                    $q->where('email', $email)
+                      ->orWhereRaw('LOWER(email) = ?', [strtolower($email)]);
+                });
+
+            if ($user_id) {
+                $emailQuery->where('id', '!=', $user_id);
+            }
+
+            if ($emailQuery->exists()) {
+                return response()->json(['error' => 'Email already exists.'], 409);
+            }
+        }
+
         // Update teacher fields (excluding organisation)
         $updateData = [];
 
@@ -125,8 +163,6 @@ class User extends Controller
         if (!empty($updateData)) {
             $teacherQuery->update($updateData);
         }
-
-        $user_id = $teacher->user_id;
 
         // Update auth_user fields
         if ($user_id) {
@@ -1260,13 +1296,23 @@ class User extends Controller
     public function addTeacher(Request $request)
     {
         // Check if username already exists
-        $existingUsername = DB::table('auth_user')->where('username', $request->username)->exists();
+        $existingUsername = DB::table('auth_user')
+            ->where(function ($q) use ($request) {
+                $q->where('username', $request->username)
+                  ->orWhereRaw('LOWER(username) = ?', [strtolower($request->username)]);
+            })
+            ->exists();
         if ($existingUsername) {
             return response()->json(['error' => 'Username already exists.'], 409);
         }
 
         // Check if email already exists
-        $existingEmail = DB::table('auth_user')->where('email', $request->email)->exists();
+        $existingEmail = DB::table('auth_user')
+            ->where(function ($q) use ($request) {
+                $q->where('email', $request->email)
+                  ->orWhereRaw('LOWER(email) = ?', [strtolower($request->email)]);
+            })
+            ->exists();
         if ($existingEmail) {
             return response()->json(['error' => 'Email already exists.'], 409);
         }
