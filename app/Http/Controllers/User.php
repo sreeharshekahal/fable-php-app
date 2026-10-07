@@ -97,7 +97,7 @@ class User extends Controller
             return response()->json(['message' => 'Teacher not found'], 404);
         }
 
-        // Update teacher fields (excluding organisation and type)
+        // Update teacher fields (excluding organisation)
         $updateData = [];
 
         // Multiple divisions support (accepts array or comma-separated string)
@@ -116,6 +116,10 @@ class User extends Controller
 
         if ($request->has('gender')) {
             $updateData['gender'] = $request->get('gender');
+        }
+
+        if ($request->has('type')) {
+            $updateData['type'] = $request->input('type');
         }
 
         if (!empty($updateData)) {

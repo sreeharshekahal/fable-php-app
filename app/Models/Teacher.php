@@ -14,8 +14,10 @@ class Teacher extends Model
     protected $fillable = [
         'id',
         'user_id',
-        'organisation_id'
-        // Add other fields from access_teacher table if needed
+        'organisation_id',
+        'type',
+        'gender',
+        'division',
     ];
 
     public function user()
