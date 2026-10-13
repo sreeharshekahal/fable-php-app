@@ -17,6 +17,7 @@ use App\Http\Controllers\GroupingParameterController;
 use App\Http\Controllers\AccuracyController;
 use App\Http\Controllers\BenchmarkTemplateController;
 use App\Http\Controllers\PassageController;
+use App\Http\Controllers\StudentBulkUpdateController;
 
 
 /*
@@ -54,6 +55,16 @@ Route::get('/passagePDF/{id}', [User::class, 'getPassagePDFNew']);
 Route::post('/add-student', [User::class, 'addStudent']);
 Route::post('/edit-student/{id}', [User::class, 'editStudent']);
 Route::post('/add-teacher', [User::class, 'addTeacher']);
+
+Route::middleware(['django.auth'])->group(function () {
+    // Student Bulk Update
+    Route::middleware(['admin.permission'])->group(function () {
+        Route::post('/students/bulk-update', [StudentBulkUpdateController::class, 'bulkUpdate']);
+        Route::get('/students/bulk-update/stats', [StudentBulkUpdateController::class, 'getStats']);
+        Route::get('/students/list', [StudentBulkUpdateController::class, 'listStudents']);
+    });
+});
+
 Route::get('/students', [StudentController::class, 'getStudents']);
 Route::get('/students/{id}', [User::class, 'getStudent']);
 
@@ -106,7 +117,10 @@ Route::middleware(['django.auth'])->group(function () {
         Route::delete('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'destroy']);
         Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
 
+        Route::patch('/passages/{id}', [PassageController::class, 'update']);
+        Route::put('/passages/{id}', [PassageController::class, 'update']);
         Route::put('/passages/{id}/status', [PassageController::class, 'updateStatus']);
+
     });
 
     Route::post('/assessments', [AssessmentController::class, 'postAssessments']);
