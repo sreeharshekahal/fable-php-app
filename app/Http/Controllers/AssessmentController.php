@@ -106,8 +106,9 @@ class AssessmentController extends Controller
             );
 
         // --- Filters ---
-        if ($request->filled('student__id')) {
-            $query->where('a.student_id', $request->input('student__id'));
+        $studentId = $request->input('student__id') ?? $request->input('student_id') ?? $request->input('student');
+        if (!empty($studentId)) {
+            $query->where('a.student_id', $studentId);
         }
         if ($request->filled('passage__id')) {
             $query->where('a.passage_id', $request->input('passage__id'));
@@ -152,14 +153,14 @@ class AssessmentController extends Controller
                     ->where('cl.name', $val);
             });
         }
-        if ($request->filled('passage__language__name') || $request->filled('language')) {
-            $val = $request->input('passage__language__name') ?? $request->input('language');
+        if ($request->filled('passage__language__name') || $request->filled('language') || $request->filled('languages__name')) {
+            $val = $request->input('passage__language__name') ?? $request->input('language') ?? $request->input('languages__name');
             $query->whereExists(function ($q) use ($val) {
                 $q->select(DB::raw(1))
                     ->from('passage_passage as pp')
                     ->join('common_language as cl', 'pp.language_id', '=', 'cl.id')
                     ->whereColumn('pp.id', 'a.passage_id')
-                    ->where('cl.name', $val);
+                    ->where('cl.name', 'ilike', $val);
             });
         }
         if ($request->filled('organisation__languages__name')) {
@@ -381,6 +382,7 @@ class AssessmentController extends Controller
                 'last_word_index' => $row->last_word_index,
                 'last_word' => $row->last_word,
                 'notes' => $row->notes,
+                'qualitative_feedback' => $row->notes ?: 'None',
                 'no_error_words' => $row->no_error_words,
                 'passage' => $row->passage_id,
                 'student' => $row->student_id,
@@ -859,6 +861,7 @@ class AssessmentController extends Controller
                 'o.title as organisation_name',
                 'u.first_name as student_first_name',
                 'u.last_name as student_last_name',
+                's.division as division',
                 'g.title as grade_title',
                 'g.id as grade_id',
                 'grp.title as group_title',
@@ -867,7 +870,6 @@ class AssessmentController extends Controller
                 'ct.first_name as conductor_first_name',
                 'ct.last_name as conductor_last_name',
                 's.gender as student_gender',
-                's.division as student_division',
                 'a.created',
                 'a.type as assessment_type_code',
                 'p.number as passage_number',
@@ -907,6 +909,8 @@ class AssessmentController extends Controller
         $columns = [
             'organisation',
             'student',
+            'division',
+            'language',
             'grade',
             'from_group',
             'to_group',
@@ -972,6 +976,8 @@ class AssessmentController extends Controller
                     fputcsv($file, [
                         $row->organisation_name,
                         $student_name,
+                        $row->division ?? '',
+                        $row->language_name ?? '',
                         $row->grade_title,
                         $row->assessment_type_code == 1 ? 'G' . $row->grade_level . ' Benchmarking' : $row->group_title,
                         $row->assessment_type_code == 1 ? $row->group_title : '-',
@@ -979,7 +985,7 @@ class AssessmentController extends Controller
                         $this->genderLabel($row->student_gender),
                         $created->year,
                         $created->format('Y-m-d'),
-                        $row->assessment_type_code == 0 ? 'Progressive' : 'Benchmark',
+                        $row->assessment_type_code == 0 ? 'Progress Monitoring' : 'Benchmark',
                         $row->grade_level . '-' . $row->passage_number,
                         $row->passage_name,
                         $correct_words,

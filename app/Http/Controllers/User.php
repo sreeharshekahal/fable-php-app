@@ -113,7 +113,7 @@ class User extends Controller
             }
 
             if ($usernameQuery->exists()) {
-                return response()->json(['error' => 'Username already exists.'], 409);
+                return response()->json(['error' => 'Username already exists.'], 422);
             }
         }
 
@@ -131,7 +131,7 @@ class User extends Controller
             }
 
             if ($emailQuery->exists()) {
-                return response()->json(['error' => 'Email already exists.'], 409);
+                return response()->json(['error' => 'Email already exists.'], 422);
             }
         }
 
@@ -1303,7 +1303,7 @@ class User extends Controller
             })
             ->exists();
         if ($existingUsername) {
-            return response()->json(['error' => 'Username already exists.'], 409);
+            return response()->json(['error' => 'Username already exists.'], 422);
         }
 
         // Check if email already exists
@@ -1314,7 +1314,7 @@ class User extends Controller
             })
             ->exists();
         if ($existingEmail) {
-            return response()->json(['error' => 'Email already exists.'], 409);
+            return response()->json(['error' => 'Email already exists.'], 422);
         }
 
         $password = $request->password;
@@ -2034,6 +2034,15 @@ class User extends Controller
             ->where('student_id', $student->id)
             ->exists();
 
+        // Calculate Academic Year using exact BOY cycle logic
+        $allStudentAssessments = DB::table('assessment_assessment')
+            ->where('student_id', $student->id)
+            ->select('id', 'created', 'assessment_period', 'type')
+            ->orderBy('created', 'asc')
+            ->get();
+        $academicYearInfo = app(\App\Services\StudentAssessmentReportService::class)->calculateAcademicYearInfo($allStudentAssessments);
+        $academicYear = $academicYearInfo['academic_year'];
+
         return response()->json([
             'id'           => $student->id,
             'group_detail' => $groupDetail,
@@ -2067,8 +2076,10 @@ class User extends Controller
             'organisation'                => $student->organisation_id,
             'grade'                       => $student->grade_id,
             'group'                       => $student->group_id,
+            'group_name'                  => $groupDetail['title'] ?? null,
             'group_hindi'                 => $student->group_hindi_id,
             'group_marathi'               => $student->group_marathi_id,
+            'academic_year'               => $academicYear,
             'benchmark_template_id'       => $benchmarkTemplateId,
         ], 200);
     }
