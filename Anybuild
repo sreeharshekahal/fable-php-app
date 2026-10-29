@@ -8,6 +8,8 @@ config = laravel_config(
     composer_enable = True,
     composer_build_script = "post-update-cmd",
     php_version = "8.3.29",
+    # ZipStream (used by spreadsheet exports) requires 64-bit PHP integers.
+    php_architecture = "64-bit",
     php_public_dir = "public",
 )
 
