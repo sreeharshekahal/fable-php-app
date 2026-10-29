@@ -18,6 +18,7 @@ use App\Http\Controllers\AccuracyController;
 use App\Http\Controllers\BenchmarkTemplateController;
 use App\Http\Controllers\PassageController;
 use App\Http\Controllers\StudentBulkUpdateController;
+use App\Http\Controllers\StudentAssessmentReportController;
 
 
 /*
@@ -67,6 +68,7 @@ Route::middleware(['django.auth'])->group(function () {
 
 Route::get('/students', [StudentController::class, 'getStudents']);
 Route::get('/students/{id}', [User::class, 'getStudent']);
+Route::get('/students/{id}/assessment-report', [StudentAssessmentReportController::class, 'getReport']);
 
 Route::middleware(['django.auth'])->group(function () {
     Route::delete('/students/{id}', [StudentController::class, 'deleteStudent']);
