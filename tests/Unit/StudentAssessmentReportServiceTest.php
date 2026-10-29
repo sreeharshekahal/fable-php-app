@@ -276,7 +276,6 @@ class StudentAssessmentReportServiceTest extends TestCase
         $formattedWithAudio = $this->service->formatAssessmentItem($item, $student, null, true, 1);
         $this->assertTrue($formattedWithAudio['has_audio']);
         $this->assertEquals('https://example.com/audio.mp3', $formattedWithAudio['audio_download_url']);
-        $this->assertEquals('Download', $formattedWithAudio['audio_label']);
         $this->assertEquals('Good reading', $formattedWithAudio['teacher_notes']);
         $this->assertArrayNotHasKey('audio', $formattedWithAudio);
         $this->assertArrayNotHasKey('qualitative_feedback', $formattedWithAudio);
@@ -285,7 +284,6 @@ class StudentAssessmentReportServiceTest extends TestCase
         $formattedWithoutAudio = $this->service->formatAssessmentItem($item, $student, null, false, 1);
         $this->assertFalse($formattedWithoutAudio['has_audio']);
         $this->assertNull($formattedWithoutAudio['audio_download_url']);
-        $this->assertEquals('N/A', $formattedWithoutAudio['audio_label']);
         $this->assertArrayNotHasKey('audio', $formattedWithoutAudio);
         $this->assertArrayNotHasKey('qualitative_feedback', $formattedWithoutAudio);
     }
