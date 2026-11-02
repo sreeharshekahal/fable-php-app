@@ -20,6 +20,7 @@ use App\Http\Controllers\AccuracyController;
 use App\Http\Controllers\BenchmarkTemplateController;
 use App\Http\Controllers\PassageController;
 use App\Http\Controllers\StudentBulkUpdateController;
+use App\Http\Controllers\AuthPasswordController;
 use App\Http\Controllers\StudentAssessmentReportController;
 
 
@@ -59,23 +60,33 @@ Route::post('/add-student', [User::class, 'addStudent']);
 Route::post('/edit-student/{id}', [User::class, 'editStudent']);
 Route::post('/add-teacher', [User::class, 'addTeacher']);
 
+// Password Reset endpoints
+Route::post('/password/reset', [AuthPasswordController::class, 'passwordReset']);
+Route::post('/password/reset/confirm', [AuthPasswordController::class, 'passwordResetConfirm']);
+Route::post('/forgot-password/{uid}/{token}/', [AuthPasswordController::class, 'passwordResetConfirm']);
+
 Route::middleware(['django.auth'])->group(function () {
+    Route::post('/password/change', [AuthPasswordController::class, 'passwordChange']);
     Route::middleware(['role:admin'])->group(function () {
         Route::get('/group-wise-distribution-per-grade', [OrganisationAnalyticsController::class, 'groupWiseDistributionPerGrade']);
         Route::delete('/bulk-delete-users', [UserController::class, 'bulkDeleteUsers']);
         Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
     });
+
+    // Student Bulk Update
+    Route::middleware(['admin.permission'])->group(function () {
+        Route::post('/students/bulk-update', [StudentBulkUpdateController::class, 'bulkUpdate']);
+        Route::get('/students/bulk-update/stats', [StudentBulkUpdateController::class, 'getStats']);
+        Route::get('/students/list', [StudentBulkUpdateController::class, 'listStudents']);
+    });
 });
 
 Route::middleware(['django.auth', 'admin.permission'])->prefix('students')->group(function () {
-    // Student Bulk Update
-    Route::get('/list', [StudentBulkUpdateController::class, 'listStudents']);
-    Route::post('/bulk-update', [StudentBulkUpdateController::class, 'bulkUpdate']);
-    Route::get('/bulk-update/stats', [StudentBulkUpdateController::class, 'getStats']);
-    Route::get('', [StudentController::class, 'getStudents']);
-    Route::get('/{id}', [User::class, 'getStudent']);
     Route::get('/{id}/assessment-report', [StudentAssessmentReportController::class, 'getReport']);
 });
+
+Route::get('/students', [StudentController::class, 'getStudents']);
+Route::get('/students/{id}', [User::class, 'getStudent']);
 
 Route::middleware(['django.auth'])->group(function () {
     Route::delete('/students/{id}', [StudentController::class, 'deleteStudent']);

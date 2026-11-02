@@ -49,7 +49,7 @@ class VerifyUserRole
         }
 
         return response()->json([
-            'error' => 'Insufficient role permissions.',
+            'error' => 'Restricted for ' . implode(', ', $roles) . ' users.',
         ], Response::HTTP_FORBIDDEN);
     }
 }
