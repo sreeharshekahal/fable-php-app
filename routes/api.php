@@ -81,7 +81,7 @@ Route::middleware(['django.auth'])->group(function () {
     });
 });
 
-Route::middleware(['django.auth', 'admin.permission'])->prefix('students')->group(function () {
+Route::middleware(['django.auth'])->prefix('students')->group(function () {
     Route::get('/{id}/assessment-report', [StudentAssessmentReportController::class, 'getReport']);
 });
 
