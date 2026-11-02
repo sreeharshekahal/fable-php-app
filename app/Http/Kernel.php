@@ -69,5 +69,6 @@ class Kernel extends HttpKernel
         'teacher.auth' => \App\Http\Middleware\TeacherAuth::class,
         'django.auth' => \App\Http\Middleware\DjangoTokenAuth::class,
         'admin.permission' => \App\Http\Middleware\AdminPermission::class,
+        'role' => \App\Http\Middleware\VerifyUserRole::class,
     ];
 }

@@ -6,6 +6,9 @@ use App\Http\Controllers\User;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\AssessmentCountController;
+use App\Http\Controllers\OrganisationAnalyticsController;
+use App\Http\Controllers\BulkDeleteUsersController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\OrganisationGroupController;
@@ -58,6 +61,12 @@ Route::post('/edit-student/{id}', [User::class, 'editStudent']);
 Route::post('/add-teacher', [User::class, 'addTeacher']);
 
 Route::middleware(['django.auth'])->group(function () {
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('/group-wise-distribution-per-grade', [OrganisationAnalyticsController::class, 'groupWiseDistributionPerGrade']);
+        Route::delete('/bulk-delete-users', [BulkDeleteUsersController::class, 'destroy']);
+        Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
+    });
+
     // Student Bulk Update
     Route::middleware(['admin.permission'])->group(function () {
         Route::post('/students/bulk-update', [StudentBulkUpdateController::class, 'bulkUpdate']);
@@ -81,6 +90,12 @@ Route::middleware(['django.auth'])->group(function () {
     Route::get('/me', [UserController::class, 'me']);
 
     Route::get('/offline-data', [OrganisationController::class, 'offlineData']);
+
+    Route::middleware(['role:admin,teacher'])->group(function () {
+        Route::get('/no-of-assessments-organisation-wise', [AssessmentCountController::class, 'organisationWise']);
+        Route::get('/no-of-assessments-grade-wise', [AssessmentCountController::class, 'gradeWise']);
+        Route::get('/no-of-assessments-group-wise', [AssessmentCountController::class, 'groupWise']);
+    });
 
     Route::get('/organisations', [OrganisationController::class, 'index']);
     Route::get('/organisations/{id}', [OrganisationController::class, 'show']);
@@ -117,12 +132,10 @@ Route::middleware(['django.auth'])->group(function () {
         Route::get('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'show']);
         Route::put('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'update']);
         Route::delete('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'destroy']);
-        Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
 
         Route::patch('/passages/{id}', [PassageController::class, 'update']);
         Route::put('/passages/{id}', [PassageController::class, 'update']);
         Route::put('/passages/{id}/status', [PassageController::class, 'updateStatus']);
-
     });
 
     Route::post('/assessments', [AssessmentController::class, 'postAssessments']);
