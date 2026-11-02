@@ -5,9 +5,12 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-class BulkDeleteUsersService
+class UserService
 {
-    public function delete(array $teachers, array $students): void
+    /**
+     * Bulk delete teachers and students along with related user records and associations.
+     */
+    public function bulkDelete(array $teachers, array $students): void
     {
         DB::transaction(function () use ($teachers, $students) {
             $userIds = DB::table('access_teacher')->whereIn('id', $teachers)->pluck('user_id')
@@ -40,5 +43,13 @@ class BulkDeleteUsersService
             }
             DB::table('auth_user')->whereIn('id', $userIds)->delete();
         });
+    }
+
+    /**
+     * Backward-compatible alias for bulk delete.
+     */
+    public function delete(array $teachers, array $students): void
+    {
+        $this->bulkDelete($teachers, $students);
     }
 }

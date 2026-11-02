@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Constants\TranslationConstants;
 use App\Models\BenchmarkTemplate;
 use App\Models\UserModel;
+use App\Services\UserService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
@@ -71,23 +72,9 @@ class UserController extends Controller
                 ]
             ];
 
-            $langParam = $request->query('language', $request->query('lang', $request->query('languages__name', 'English')));
-            if (is_array($langParam)) {
-                $langParam = reset($langParam);
-            }
-            $language = null;
-            if (!empty($langParam) && is_string($langParam)) {
-                if (Str::isUuid($langParam)) {
-                    $language = DB::table('common_language')->where('id', $langParam)->first();
-                } else {
-                    $language = DB::table('common_language')->where('name', 'ilike', $langParam)->first();
-                }
-            }
-            if (!$language) {
-                $language = DB::table('common_language')->where('name', 'ilike', 'English')->first();
-            }
-            $languageId = $language ? $language->id : null;
-            $langName = $language ? $language->name : 'English';
+            $langName = $request->query('language', $request->query('lang', $request->query('languages__name', 'English')));
+            $language = DB::table('common_language')->where('name', 'ilike', $langName)->first();
+            $languageId = $language ? $language->id : DB::table('common_language')->where('name', 'ilike', 'English')->value('id');
 
             $groupDetails = [];
             $groups = DB::table('access_teacher_groups')
@@ -690,23 +677,11 @@ class UserController extends Controller
         }
 
         // Language Handling
-        $langParam = $request->query('language', $request->query('lang', $request->query('languages__name', 'English')));
-        if (is_array($langParam)) {
-            $langParam = reset($langParam);
-        }
-        $language = null;
-        if (!empty($langParam) && is_string($langParam)) {
-            if (Str::isUuid($langParam)) {
-                $language = DB::table('common_language')->where('id', $langParam)->first();
-            } else {
-                $language = DB::table('common_language')->where('name', 'ilike', $langParam)->first();
-            }
-        }
+        $language = DB::table('common_language')->where('name', 'ilike', $langName)->first();
         if (!$language) {
             $language = DB::table('common_language')->where('name', 'ilike', 'English')->first();
         }
-        $languageId = $language ? $language->id : null;
-        $langName = $language ? $language->name : 'English';
+        $languageId = $language ? $language->id : (DB::table('common_language')->where('name', 'ilike', 'English')->value('id'));
 
         $groupColumn = 'group_id';
         if (strtolower($langName) === 'hindi') {
@@ -1024,5 +999,28 @@ class UserController extends Controller
         }
 
         return implode(' ', $translatedParts);
+    }
+
+    /**
+     * Bulk delete teachers and students.
+     */
+    public function bulkDeleteUsers(Request $request, UserService $service)
+    {
+        // Decode objects separately so that {} cannot be mistaken for an empty list.
+        $body = json_decode($request->getContent());
+        if (!is_object($body) || !isset($body->teachers, $body->students)
+            || !is_array($body->teachers) || !is_array($body->students)) {
+            return response()->json(['details' => 'invalid data format'], 400);
+        }
+        $validator = Validator::make((array) $body, [
+            'teachers.*' => 'required|uuid',
+            'students.*' => 'required|uuid',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['details' => 'invalid data format'], 400);
+        }
+
+        $service->bulkDelete($body->teachers, $body->students);
+        return response()->noContent();
     }
 }
