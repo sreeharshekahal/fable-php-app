@@ -103,8 +103,10 @@ class AuthPasswordController extends Controller
                         ->from($fromEmail, $fromName)
                         ->subject('Set Password of your FABLe account');
                 });
-            } catch (\Exception $e) {
-                // If mail sending fails, continue or log error
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Password reset mail error: ' . $e->getMessage(), [
+                    'exception' => $e,
+                ]);
             }
         }
 

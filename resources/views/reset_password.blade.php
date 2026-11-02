@@ -93,9 +93,9 @@
 			table-layout:fixed !important;
 		}
 	/*
-	@tab Page
-	@section Heading 1
-	@style heading 1
+	tab: Page
+	section: Heading 1
+	style: heading 1
 	*/
 		h1{
 			color:#222222;
@@ -108,9 +108,9 @@
 			text-align:left;
 		}
 	/*
-	@tab Page
-	@section Heading 2
-	@style heading 2
+	tab: Page
+	section: Heading 2
+	style: heading 2
 	*/
 		h2{
 			color:#222222;
@@ -123,9 +123,9 @@
 			text-align:left;
 		}
 	/*
-	@tab Page
-	@section Heading 3
-	@style heading 3
+	tab: Page
+	section: Heading 3
+	style: heading 3
 	*/
 		h3{
 			color:#444444;
@@ -138,9 +138,9 @@
 			text-align:left;
 		}
 	/*
-	@tab Page
-	@section Heading 4
-	@style heading 4
+	tab: Page
+	section: Heading 4
+	style: heading 4
 	*/
 		h4{
 			color:#949494;
@@ -153,8 +153,8 @@
 			text-align:left;
 		}
 	/*
-	@tab Header
-	@section Header Container Style
+	tab: Header
+	section: Header Container Style
 	*/
 		#templateHeader{
 			background-color:#F7F7F7;
@@ -168,8 +168,8 @@
 			padding-bottom:20px;
 		}
 	/*
-	@tab Header
-	@section Header Interior Style
+	tab: Header
+	section: Header Interior Style
 	*/
 		.headerContainer{
 			background-color:transparent;
@@ -183,8 +183,8 @@
 			padding-bottom:0;
 		}
 	/*
-	@tab Header
-	@section Header Text
+	tab: Header
+	section: Header Text
 	*/
 		.headerContainer .mcnTextContent,.headerContainer .mcnTextContent p{
 			color:#757575;
@@ -194,8 +194,8 @@
 			text-align:left;
 		}
 	/*
-	@tab Header
-	@section Header Link
+	tab: Header
+	section: Header Link
 	*/
 		.headerContainer .mcnTextContent a,.headerContainer .mcnTextContent p a{
 			color:#070046;
@@ -203,8 +203,8 @@
 			text-decoration:underline;
 		}
 	/*
-	@tab Body
-	@section Body Container Style
+	tab: Body
+	section: Body Container Style
 	*/
 		#templateBody{
 			background-color:#FFFFFF;
@@ -218,8 +218,8 @@
 			padding-bottom:19px;
 		}
 	/*
-	@tab Body
-	@section Body Interior Style
+	tab: Body
+	section: Body Interior Style
 	*/
 		.bodyContainer{
 			background-color:transparent;
@@ -233,8 +233,8 @@
 			padding-bottom:0;
 		}
 	/*
-	@tab Body
-	@section Body Text
+	tab: Body
+	section: Body Text
 	*/
 		.bodyContainer .mcnTextContent,.bodyContainer .mcnTextContent p{
 			color:#757575;
@@ -244,8 +244,8 @@
 			text-align:left;
 		}
 	/*
-	@tab Body
-	@section Body Link
+	tab: Body
+	section: Body Link
 	*/
 		.bodyContainer .mcnTextContent a,.bodyContainer .mcnTextContent p a{
 			color:#007C89;
@@ -253,8 +253,8 @@
 			text-decoration:underline;
 		}
 	/*
-	@tab Footer
-	@section Footer Style
+	tab: Footer
+	section: Footer Style
 	*/
 		#templateFooter{
 			background-color:#f7f7f7;
@@ -268,8 +268,8 @@
 			padding-bottom:0px;
 		}
 	/*
-	@tab Footer
-	@section Footer Interior Style
+	tab: Footer
+	section: Footer Interior Style
 	*/
 		.footerContainer{
 			background-color:transparent;
@@ -283,8 +283,8 @@
 			padding-bottom:0;
 		}
 	/*
-	@tab Footer
-	@section Footer Text
+	tab: Footer
+	section: Footer Text
 	*/
 		.footerContainer .mcnTextContent,.footerContainer .mcnTextContent p{
 			color:#FFFFFF;
@@ -294,8 +294,8 @@
 			text-align:center;
 		}
 	/*
-	@tab Footer
-	@section Footer Link
+	tab: Footer
+	section: Footer Link
 	*/
 		.footerContainer .mcnTextContent a,.footerContainer .mcnTextContent p a{
 			color:#FFFFFF;
@@ -392,9 +392,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Heading 1
-	@tip Make the first-level headings larger in size for better readability on small screens.
+	tab: Mobile Styles
+	section: Heading 1
+	tip: Make the first-level headings larger in size for better readability on small screens.
 	*/
 		h1{
 			font-size:30px !important;
@@ -403,9 +403,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Heading 2
-	@tip Make the second-level headings larger in size for better readability on small screens.
+	tab: Mobile Styles
+	section: Heading 2
+	tip: Make the second-level headings larger in size for better readability on small screens.
 	*/
 		h2{
 			font-size:26px !important;
@@ -414,9 +414,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Heading 3
-	@tip Make the third-level headings larger in size for better readability on small screens.
+	tab: Mobile Styles
+	section: Heading 3
+	tip: Make the third-level headings larger in size for better readability on small screens.
 	*/
 		h3{
 			font-size:20px !important;
@@ -425,9 +425,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Heading 4
-	@tip Make the fourth-level headings larger in size for better readability on small screens.
+	tab: Mobile Styles
+	section: Heading 4
+	tip: Make the fourth-level headings larger in size for better readability on small screens.
 	*/
 		h4{
 			font-size:18px !important;
@@ -436,9 +436,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Boxed Text
-	@tip Make the boxed text larger in size for better readability on small screens. We recommend a font size of at least 16px.
+	tab: Mobile Styles
+	section: Boxed Text
+	tip: Make the boxed text larger in size for better readability on small screens. We recommend a font size of at least 16px.
 	*/
 		.mcnBoxedTextContentContainer .mcnTextContent,.mcnBoxedTextContentContainer .mcnTextContent p{
 			font-size:14px !important;
@@ -447,9 +447,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Header Text
-	@tip Make the header text larger in size for better readability on small screens.
+	tab: Mobile Styles
+	section: Header Text
+	tip: Make the header text larger in size for better readability on small screens.
 	*/
 		.headerContainer .mcnTextContent,.headerContainer .mcnTextContent p{
 			font-size:16px !important;
@@ -458,9 +458,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Body Text
-	@tip Make the body text larger in size for better readability on small screens. We recommend a font size of at least 16px.
+	tab: Mobile Styles
+	section: Body Text
+	tip: Make the body text larger in size for better readability on small screens. We recommend a font size of at least 16px.
 	*/
 		.bodyContainer .mcnTextContent,.bodyContainer .mcnTextContent p{
 			font-size:16px !important;
@@ -469,9 +469,9 @@
 
 }	@media only screen and (max-width: 480px){
 	/*
-	@tab Mobile Styles
-	@section Footer Text
-	@tip Make the footer content text larger in size for better readability on small screens.
+	tab: Mobile Styles
+	section: Footer Text
+	tip: Make the footer content text larger in size for better readability on small screens.
 	*/
 		.footerContainer .mcnTextContent,.footerContainer .mcnTextContent p{
 			font-size:14px !important;

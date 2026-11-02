@@ -9,12 +9,18 @@ class Grade extends Model
     protected $table = 'common_grade';
     protected $keyType = 'string';
     public $incrementing = false;
-    public $timestamps = true;
+    public $timestamps = false;
+
+    const CREATED_AT = 'created';
+    const UPDATED_AT = 'updated';
 
     protected $fillable = [
         'id',
         'level',
-        'title'
+        'title',
+        'description',
+        'created',
+        'updated'
     ];
 
     // Relationships
@@ -47,5 +53,10 @@ class Grade extends Model
     public function groupingParameters()
     {
         return $this->hasMany(GroupingParameter::class, 'grade_id');
+    }
+
+    public function passages()
+    {
+        return $this->hasMany(Passage::class, 'grade_id');
     }
 }

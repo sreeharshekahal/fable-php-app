@@ -18,6 +18,7 @@ use App\Http\Controllers\WordController;
 use App\Http\Controllers\GroupingParameterController;
 use App\Http\Controllers\AccuracyController;
 use App\Http\Controllers\BenchmarkTemplateController;
+use App\Http\Controllers\GradeController;
 use App\Http\Controllers\PassageController;
 use App\Http\Controllers\StudentBulkUpdateController;
 use App\Http\Controllers\AuthPasswordController;
@@ -61,7 +62,7 @@ Route::post('/add-student', [User::class, 'addStudent']);
 Route::post('/edit-student/{id}', [User::class, 'editStudent']);
 Route::post('/add-teacher', [User::class, 'addTeacher']);
 
-// Auth & Password Reset endpoints
+// Auth & Password Reset endpoints (Django rest-auth compatible)
 Route::prefix('rest-auth')->group(function () {
     Route::post('/login', [AuthSessionController::class, 'login']);
     Route::post('/login/', [AuthSessionController::class, 'login']);
@@ -126,6 +127,17 @@ Route::middleware(['django.auth'])->group(function () {
         Route::get('/no-of-assessments-organisation-wise', [AssessmentCountController::class, 'organisationWise']);
         Route::get('/no-of-assessments-grade-wise', [AssessmentCountController::class, 'gradeWise']);
         Route::get('/no-of-assessments-group-wise', [AssessmentCountController::class, 'groupWise']);
+
+        Route::get('/grades', [GradeController::class, 'index']);
+        Route::get('/grades/{id}', [GradeController::class, 'show']);
+
+        Route::get('/passages', [PassageController::class, 'index']);
+        Route::get('/passages/{id}', [PassageController::class, 'show']);
+
+        Route::get('/checklists', [AssessmentController::class, 'getChecklists']);
+        Route::get('/checklists/{id}', [AssessmentController::class, 'getChecklistDetails']);
+
+        Route::get('/word-level-analysis', [AssessmentController::class, 'wordLevelAnalysis']);
     });
 
     Route::get('/organisations', [OrganisationController::class, 'index']);
@@ -136,9 +148,6 @@ Route::middleware(['django.auth'])->group(function () {
 
     Route::get('/words', [WordController::class, 'index']);
     Route::get('/words/{wordId}', [WordController::class, 'show']);
-
-    Route::get('/passages', [PassageController::class, 'index']);
-    Route::get('/passages/{id}', [PassageController::class, 'show']);
 
     Route::middleware(['admin.permission'])->group(function () {
         Route::get('/grouping-parameters', [GroupingParameterController::class, 'index']);
@@ -188,6 +197,3 @@ Route::get('/users', [UserController::class, 'getUsers']);
 Route::get('/users/{id}', [UserController::class, 'getUserDetails']);
 
 Route::get('/generate-excel', [AssessmentController::class, 'generateExcel']);
-
-Route::get('/checklists', [AssessmentController::class, 'getChecklists']);
-Route::get('/checklists/{id}', [AssessmentController::class, 'getChecklistDetails']);

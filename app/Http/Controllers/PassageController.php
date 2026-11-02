@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Grade;
+use App\Models\Language;
 use App\Models\Passage;
 use App\Models\PassageWord;
 use App\Models\WordMorphemeMap;
@@ -11,6 +13,7 @@ use App\Services\WordCategorizationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class PassageController extends Controller
 {
@@ -169,30 +172,9 @@ class PassageController extends Controller
 
         $results = [];
         foreach ($passages as $passage) {
-            $langName = $passage->language ? $passage->language->name : 'English';
-            $words = $this->categorizationService->getWordsFromPassage($passage->content ?? $passage->raw_content ?? '', $langName);
-            $uniqueWords = array_unique($words);
-
-            $results[] = [
-                'id' => $passage->id,
-                'word_count' => count($words),
-                'grade_no' => $passage->grade ? (int) $passage->grade->level : 0,
-                'is_assessed' => isset($assessedMap[$passage->id]),
-                'no_unique_words' => count($uniqueWords),
-                'passage_no' => ($passage->grade ? (string) $passage->grade->level : '0') . '-' . $passage->number,
-                'is_current_student_assessed' => $studentId ? isset($studentAssessedMap[$passage->id]) : null,
-                'raw_content' => $passage->raw_content,
-                'language' => $passage->language ? $passage->language->name : null,
-                'created' => $this->formatDateTime($passage->created),
-                'updated' => $this->formatDateTime($passage->updated),
-                'passage_name' => $passage->passage_name,
-                'content' => $passage->content,
-                'number' => (int) $passage->number,
-                'readability_score' => (float) ($passage->readability_score ?? 0.0),
-                'grade' => $passage->grade_id,
-                'created_by' => $passage->created_by_id,
-                'status' => (bool) $passage->status,
-            ];
+            $isAssessed = isset($assessedMap[$passage->id]);
+            $isCurrentStudent = $studentId ? isset($studentAssessedMap[$passage->id]) : null;
+            $results[] = $this->formatPassageResponse($passage, $studentId, $isAssessed, $isCurrentStudent);
         }
 
         $queryParams = $request->query();
@@ -338,6 +320,129 @@ class PassageController extends Controller
     }
 
     /**
+     * Update a passage.
+     * Matches Python Django implementation: PassageViewSet.update
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function update(Request $request, $id)
+    {
+        $sanitizedId = $this->sanitizeUuid($id);
+
+        if (!$sanitizedId) {
+            return response()->json([
+                'detail' => 'Not found.'
+            ], 404);
+        }
+
+        $passage = Passage::with(['grade', 'language'])->find($sanitizedId);
+
+        if (!$passage) {
+            return response()->json([
+                'detail' => 'Not found.'
+            ], 404);
+        }
+
+        $data = $request->all();
+
+        if (isset($data['status'])) {
+            if ($data['status'] === 'true' || $data['status'] === 1 || $data['status'] === '1') {
+                $data['status'] = true;
+            } elseif ($data['status'] === 'false' || $data['status'] === 0 || $data['status'] === '0') {
+                $data['status'] = false;
+            }
+        }
+
+        $validator = Validator::make($data, [
+            'passage_name' => 'sometimes|required|string|max:30',
+            'content' => 'sometimes|nullable|string',
+            'raw_content' => 'sometimes|nullable|string',
+            'readability_score' => 'sometimes|nullable|numeric',
+            'grade' => 'sometimes',
+            'grade_id' => 'sometimes',
+            'language' => 'sometimes|nullable',
+            'language_id' => 'sometimes|nullable',
+            'status' => 'sometimes|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Handle grade update
+        if ($request->has('grade') || $request->has('grade_id')) {
+            $gradeInput = $request->input('grade', $request->input('grade_id'));
+            $grade = null;
+            if (is_string($gradeInput) && Str::isUuid($gradeInput)) {
+                $grade = Grade::find($gradeInput);
+            } elseif (is_numeric($gradeInput)) {
+                $grade = Grade::where('level', (int) $gradeInput)->first();
+            }
+            if (!$grade) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors' => [
+                        'grade' => ['The selected grade is invalid.']
+                    ]
+                ], 422);
+            }
+            $passage->grade_id = $grade->id;
+        }
+
+        // Handle language update
+        if ($request->has('language') || $request->has('language_id')) {
+            $langInput = $request->input('language', $request->input('language_id'));
+            $language = null;
+            if (is_string($langInput) && Str::isUuid($langInput)) {
+                $language = Language::find($langInput);
+            } elseif (is_string($langInput)) {
+                $language = Language::where('name', 'ILIKE', $langInput)->first();
+            }
+            if (!$language) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors' => [
+                        'language' => ['The selected language is invalid.']
+                    ]
+                ], 422);
+            }
+            $passage->language_id = $language->id;
+        }
+
+        if ($request->has('passage_name')) {
+            $passage->passage_name = $request->input('passage_name');
+        }
+
+        if ($request->has('content')) {
+            $passage->content = $request->input('content');
+        }
+
+        if ($request->has('raw_content')) {
+            $passage->raw_content = $request->input('raw_content');
+        }
+
+        if ($request->has('readability_score')) {
+            $passage->readability_score = $request->input('readability_score');
+        }
+
+        if (isset($data['status'])) {
+            $passage->status = (bool) $data['status'];
+        }
+
+        $passage->updated = now();
+        $passage->save();
+
+        $passage->load(['grade', 'language']);
+
+        return response()->json($this->formatPassageResponse($passage, $request->query('student')), 200);
+    }
+
+    /**
      * Update status for a passage.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -390,5 +495,55 @@ class PassageController extends Controller
             'message' => 'Passage status updated successfully',
             'data' => $passage
         ], 200);
+    }
+
+    /**
+     * Format a single passage matching Django's PassageSerializer.
+     *
+     * @param  \App\Models\Passage  $passage
+     * @param  string|null  $studentId
+     * @param  bool|null  $isAssessed
+     * @param  bool|null  $isCurrentStudentAssessed
+     * @return array
+     */
+    protected function formatPassageResponse(Passage $passage, $studentId = null, $isAssessed = null, $isCurrentStudentAssessed = null): array
+    {
+        $langName = $passage->language ? $passage->language->name : 'English';
+        $words = $this->categorizationService->getWordsFromPassage($passage->content ?? $passage->raw_content ?? '', $langName);
+        $uniqueWords = array_unique($words);
+
+        if ($isAssessed === null) {
+            $isAssessed = DB::table('assessment_assessment')
+                ->where('passage_id', $passage->id)
+                ->exists();
+        }
+
+        if ($isCurrentStudentAssessed === null && $studentId) {
+            $isCurrentStudentAssessed = DB::table('assessment_assessment')
+                ->where('passage_id', $passage->id)
+                ->where('student_id', $studentId)
+                ->exists();
+        }
+
+        return [
+            'id' => $passage->id,
+            'word_count' => count($words),
+            'grade_no' => $passage->grade ? (int) $passage->grade->level : 0,
+            'is_assessed' => (bool) $isAssessed,
+            'no_unique_words' => count($uniqueWords),
+            'passage_no' => ($passage->grade ? (string) $passage->grade->level : '0') . '-' . $passage->number,
+            'is_current_student_assessed' => $studentId ? (bool) $isCurrentStudentAssessed : null,
+            'raw_content' => $passage->raw_content,
+            'language' => $passage->language ? $passage->language->name : null,
+            'created' => $this->formatDateTime($passage->created),
+            'updated' => $this->formatDateTime($passage->updated),
+            'passage_name' => $passage->passage_name,
+            'content' => $passage->content,
+            'number' => (int) $passage->number,
+            'readability_score' => (float) ($passage->readability_score ?? 0.0),
+            'grade' => $passage->grade_id,
+            'created_by' => $passage->created_by_id,
+            'status' => (bool) $passage->status,
+        ];
     }
 }

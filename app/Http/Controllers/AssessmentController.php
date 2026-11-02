@@ -21,6 +21,7 @@ use App\Models\GroupingParameter;
 use App\Models\Language;
 use App\Models\Level;
 use App\Models\BenchmarkTemplate;
+use App\Services\WordCategorizationService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AssessmentController extends Controller
@@ -106,9 +107,8 @@ class AssessmentController extends Controller
             );
 
         // --- Filters ---
-        $studentId = $request->input('student__id') ?? $request->input('student_id') ?? $request->input('student');
-        if (!empty($studentId)) {
-            $query->where('a.student_id', $studentId);
+        if ($request->filled('student__id')) {
+            $query->where('a.student_id', $request->input('student__id'));
         }
         if ($request->filled('passage__id')) {
             $query->where('a.passage_id', $request->input('passage__id'));
@@ -153,14 +153,14 @@ class AssessmentController extends Controller
                     ->where('cl.name', $val);
             });
         }
-        if ($request->filled('passage__language__name') || $request->filled('language') || $request->filled('languages__name')) {
-            $val = $request->input('passage__language__name') ?? $request->input('language') ?? $request->input('languages__name');
+        if ($request->filled('passage__language__name') || $request->filled('language')) {
+            $val = $request->input('passage__language__name') ?? $request->input('language');
             $query->whereExists(function ($q) use ($val) {
                 $q->select(DB::raw(1))
                     ->from('passage_passage as pp')
                     ->join('common_language as cl', 'pp.language_id', '=', 'cl.id')
                     ->whereColumn('pp.id', 'a.passage_id')
-                    ->where('cl.name', 'ilike', $val);
+                    ->where('cl.name', $val);
             });
         }
         if ($request->filled('organisation__languages__name')) {
@@ -382,7 +382,6 @@ class AssessmentController extends Controller
                 'last_word_index' => $row->last_word_index,
                 'last_word' => $row->last_word,
                 'notes' => $row->notes,
-                'qualitative_feedback' => $row->notes ?: 'None',
                 'no_error_words' => $row->no_error_words,
                 'passage' => $row->passage_id,
                 'student' => $row->student_id,
@@ -751,22 +750,55 @@ class AssessmentController extends Controller
 
     public function getChecklists(Request $request)
     {
-        $limit = $request->input('limit', 50);
-        $offset = $request->input('offset', 0);
+        $limit = (int) $request->input('limit', 50);
+        $offset = (int) $request->input('offset', 0);
 
         $query = DB::table('assessment_checklist as c')
             ->leftJoin('common_language as l', 'c.language_id', '=', 'l.id');
 
-        // Filter by language name if provided (support only language__name)
+        // Filter by language name if provided (support language__name, language_name, language)
         if ($request->filled('language__name')) {
-            $query->where('l.name', $request->input('language__name'));
+            $query->where('l.name', 'ILIKE', $request->input('language__name'));
+        } elseif ($request->filled('language_name')) {
+            $query->where('l.name', 'ILIKE', $request->input('language_name'));
+        } elseif ($request->filled('language')) {
+            $query->where('l.name', 'ILIKE', $request->input('language'));
         }
 
         // Filter by type if provided, otherwise default to Fluency (0) and Retell (1)
-        if ($request->filled('type')) {
-            $query->where('c.type', $request->input('type'));
+        if ($request->has('type') && $request->input('type') !== null && $request->input('type') !== '') {
+            $query->where('c.type', (int) $request->input('type'));
         } else {
             $query->whereIn('c.type', [0, 1]);
+        }
+
+        // Search by title
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where('c.title', 'ILIKE', "%{$search}%");
+        }
+
+        // Ordering
+        if ($request->filled('ordering')) {
+            $orderingParts = explode(',', $request->input('ordering'));
+            $hasOrdered = false;
+            foreach ($orderingParts as $part) {
+                $part = trim($part);
+                if (empty($part)) {
+                    continue;
+                }
+                $direction = str_starts_with($part, '-') ? 'desc' : 'asc';
+                $field = ltrim($part, '-');
+                if (in_array($field, ['type', 'title', 'created', 'updated'])) {
+                    $query->orderBy("c.{$field}", $direction);
+                    $hasOrdered = true;
+                }
+            }
+            if (!$hasOrdered) {
+                $query->orderBy('c.type', 'asc')->orderBy('c.id', 'asc');
+            }
+        } else {
+            $query->orderBy('c.type', 'asc')->orderBy('c.id', 'asc');
         }
 
         $query->select('c.*', 'l.name as language_name');
@@ -774,10 +806,20 @@ class AssessmentController extends Controller
         $count = $query->count();
         $results = $query->offset($offset)->limit($limit)->get();
 
-        $formatted = $results->map(function ($row) {
+        $assessmentId = $request->input('assessment');
+        $selectedMap = [];
+        if ($assessmentId) {
+            $selectedMap = DB::table('assessment_assessment_checklists')
+                ->where('assessment_id', $assessmentId)
+                ->pluck('checklist_id')
+                ->flip()
+                ->toArray();
+        }
+
+        $formatted = $results->map(function ($row) use ($selectedMap) {
             return [
                 'id' => $row->id,
-                'selected' => false,
+                'selected' => isset($selectedMap[$row->id]),
                 'language' => $row->language_name,
                 'created' => $this->formatDateTime($row->created),
                 'updated' => $this->formatDateTime($row->updated),
@@ -816,15 +858,173 @@ class AssessmentController extends Controller
             return response()->json(['message' => 'Checklist not found'], 404);
         }
 
+        $assessmentId = $request->input('assessment');
+        $isSelected = false;
+        if ($assessmentId) {
+            $isSelected = DB::table('assessment_assessment_checklists')
+                ->where('assessment_id', $assessmentId)
+                ->where('checklist_id', $row->id)
+                ->exists();
+        }
+
         return response()->json([
             'id' => $row->id,
-            'selected' => false,
+            'selected' => $isSelected,
             'language' => $row->language_name,
             'created' => $this->formatDateTime($row->created),
             'updated' => $this->formatDateTime($row->updated),
             'title' => $row->title,
             'type' => (int) $row->type,
         ], 200, [], JSON_PRESERVE_ZERO_FRACTION);
+    }
+
+    /**
+     * Word level analysis endpoint.
+     * Matches Python: fable/assessment/views.py:word_level_analysis
+     *
+     * @param Request $request
+     * @param WordCategorizationService $categorizationService
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function wordLevelAnalysis(Request $request, WordCategorizationService $categorizationService)
+    {
+        $assessmentId = $request->query('assessment');
+        $languageName = $request->query('language__name') ?? $request->query('language_name') ?? $request->query('language');
+
+        if (!$assessmentId) {
+            $studentId = $request->query('student_id') ?? $request->query('student');
+            $passageId = $request->query('passage_id') ?? $request->query('passage');
+
+            if (!$studentId && !$passageId) {
+                return response()->json(['error' => 'assessment id is not sent'], 400);
+            }
+
+            $assessmentQuery = Assessment::with(['errorWords', 'passage.language']);
+            if ($studentId) {
+                $assessmentQuery->where('student_id', $studentId);
+            }
+            if ($passageId) {
+                $assessmentQuery->where('passage_id', $passageId);
+            }
+            if ($languageName) {
+                $assessmentQuery->whereHas('passage.language', function ($q) use ($languageName) {
+                    $q->where('name', 'ILIKE', $languageName);
+                });
+            }
+            $assessment = $assessmentQuery->orderBy('created', 'desc')->first();
+            if (!$assessment) {
+                return response()->json(['error' => 'Assessment not found'], 404);
+            }
+        } else {
+            $assessment = Assessment::with(['errorWords', 'passage.language'])->find($assessmentId);
+            if (!$assessment) {
+                return response()->json(['error' => 'Assessment not found'], 404);
+            }
+        }
+
+        $filterLang = $languageName ?? optional(optional($assessment->passage)->language)->name;
+
+        $category = [
+            'high' => [],
+            'medium' => [],
+            'low' => [],
+        ];
+
+        $count = [
+            'high' => ['sight_words' => 0, 'phonics' => 0, 'morphemes' => 0],
+            'medium' => ['sight_words' => 0, 'phonics' => 0, 'morphemes' => 0],
+            'low' => ['sight_words' => 0, 'phonics' => 0, 'morphemes' => 0],
+        ];
+
+        $errorWords = $assessment->errorWords;
+
+        foreach ($errorWords as $word) {
+            $passageQuery = Passage::with('language')
+                ->where('content', 'ILIKE', '%' . $word->text . '%');
+
+            if ($filterLang) {
+                $passageQuery->whereHas('language', function ($q) use ($filterLang) {
+                    $q->where('name', 'ILIKE', $filterLang);
+                });
+            }
+
+            $passages = $passageQuery->get();
+            $passageSet = [];
+
+            foreach ($passages as $passage) {
+                $pLang = $passage->language ? $passage->language->name : 'English';
+                $wordsInPassage = $categorizationService->getWordsFromPassage($passage->content ?? '', $pLang);
+                $lowerWords = array_map(function ($w) {
+                    return mb_strtolower($w, 'UTF-8');
+                }, $wordsInPassage);
+
+                if (in_array(mb_strtolower($word->text, 'UTF-8'), $lowerWords, true)) {
+                    $passageSet[] = $passage->id;
+                }
+            }
+
+            $studentsRead = 0;
+            $studentsIncorrect = 0;
+
+            if (!empty($passageSet)) {
+                $studentsRead = DB::table('assessment_assessment as a')
+                    ->join('organisation_organisation as o', 'a.organisation_id', '=', 'o.id')
+                    ->where('o.help_word_analysis', true)
+                    ->whereIn('a.passage_id', $passageSet)
+                    ->distinct()
+                    ->count('a.student_id');
+
+                $studentsIncorrect = DB::table('assessment_assessment as a')
+                    ->join('organisation_organisation as o', 'a.organisation_id', '=', 'o.id')
+                    ->join('assessment_errorwords as e', 'a.id', '=', 'e.assessment_id')
+                    ->where('o.help_word_analysis', true)
+                    ->whereIn('a.passage_id', $passageSet)
+                    ->where('e.word_id', $word->id)
+                    ->distinct()
+                    ->count('a.student_id');
+            }
+
+            $correctlyRead = 0;
+            if ($studentsRead > 0) {
+                $correctlyRead = (($studentsRead - $studentsIncorrect) / $studentsRead) * 100;
+            }
+
+            $division = $categorizationService->categorize($word);
+
+            $wordData = [
+                'id' => $word->id,
+                'text' => $word->text,
+            ];
+
+            if ($correctlyRead > 75) {
+                $category['high'][] = $wordData;
+                $this->calculateWordCount('high', $division, $count);
+            } elseif ($correctlyRead > 25 && $correctlyRead <= 75) {
+                $category['medium'][] = $wordData;
+                $this->calculateWordCount('medium', $division, $count);
+            } else {
+                $category['low'][] = $wordData;
+                $this->calculateWordCount('low', $division, $count);
+            }
+        }
+
+        return response()->json([
+            'category' => $category,
+            'count' => $count,
+        ], 200);
+    }
+
+    private function calculateWordCount(string $key, array $division, array &$count): void
+    {
+        if (!empty($division['morphemes']) && isset($division['morphemes'][0]) && count($division['morphemes'][0]) > 0) {
+            $count[$key]['morphemes']++;
+        }
+        if ($division['sight_words'] !== null) {
+            $count[$key]['sight_words']++;
+        }
+        if (!empty($division['phonics']) && count($division['phonics']) > 0) {
+            $count[$key]['phonics']++;
+        }
     }
 
     /**
