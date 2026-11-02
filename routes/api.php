@@ -21,6 +21,7 @@ use App\Http\Controllers\BenchmarkTemplateController;
 use App\Http\Controllers\PassageController;
 use App\Http\Controllers\StudentBulkUpdateController;
 use App\Http\Controllers\AuthPasswordController;
+use App\Http\Controllers\AuthSessionController;
 use App\Http\Controllers\StudentAssessmentReportController;
 
 
@@ -60,12 +61,33 @@ Route::post('/add-student', [User::class, 'addStudent']);
 Route::post('/edit-student/{id}', [User::class, 'editStudent']);
 Route::post('/add-teacher', [User::class, 'addTeacher']);
 
-// Password Reset endpoints
+// Auth & Password Reset endpoints
+Route::prefix('rest-auth')->group(function () {
+    Route::post('/login', [AuthSessionController::class, 'login']);
+    Route::post('/login/', [AuthSessionController::class, 'login']);
+    Route::post('/password/reset', [AuthPasswordController::class, 'passwordReset']);
+    Route::post('/password/reset/', [AuthPasswordController::class, 'passwordReset']);
+    Route::post('/password/reset/confirm', [AuthPasswordController::class, 'passwordResetConfirm']);
+    Route::post('/password/reset/confirm/', [AuthPasswordController::class, 'passwordResetConfirm']);
+
+    Route::middleware(['django.auth'])->group(function () {
+        Route::post('/logout', [AuthSessionController::class, 'logout']);
+        Route::post('/logout/', [AuthSessionController::class, 'logout']);
+        Route::get('/user', [AuthSessionController::class, 'user']);
+        Route::get('/user/', [AuthSessionController::class, 'user']);
+        Route::post('/password/change', [AuthPasswordController::class, 'passwordChange']);
+        Route::post('/password/change/', [AuthPasswordController::class, 'passwordChange']);
+    });
+});
+
+// Non-prefixed aliases
+Route::post('/login', [AuthSessionController::class, 'login']);
 Route::post('/password/reset', [AuthPasswordController::class, 'passwordReset']);
 Route::post('/password/reset/confirm', [AuthPasswordController::class, 'passwordResetConfirm']);
 Route::post('/forgot-password/{uid}/{token}/', [AuthPasswordController::class, 'passwordResetConfirm']);
 
 Route::middleware(['django.auth'])->group(function () {
+    Route::post('/logout', [AuthSessionController::class, 'logout']);
     Route::post('/password/change', [AuthPasswordController::class, 'passwordChange']);
     Route::middleware(['role:admin'])->group(function () {
         Route::get('/group-wise-distribution-per-grade', [OrganisationAnalyticsController::class, 'groupWiseDistributionPerGrade']);
