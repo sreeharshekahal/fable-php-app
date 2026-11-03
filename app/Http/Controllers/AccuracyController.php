@@ -110,6 +110,9 @@ class AccuracyController extends Controller
         if (!isset($data['id'])) {
             $data['id'] = (string) Str::uuid();
         }
+        if (isset($data['grade']) && !isset($data['grade_id'])) {
+            $data['grade_id'] = $data['grade'];
+        }
         
         $accuracy = Accuracy::create($data);
         $accuracy->load('grade');
@@ -130,7 +133,12 @@ class AccuracyController extends Controller
             ], 404);
         }
 
-        $accuracy->update($request->all());
+        $data = $request->all();
+        if (isset($data['grade']) && !isset($data['grade_id'])) {
+            $data['grade_id'] = $data['grade'];
+        }
+
+        $accuracy->update($data);
         $accuracy->load('grade');
 
         return response()->json($this->formatAccuracy($accuracy), 200);
