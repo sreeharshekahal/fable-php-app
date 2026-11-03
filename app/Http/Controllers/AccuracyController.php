@@ -86,6 +86,22 @@ class AccuracyController extends Controller
     }
 
     /**
+     * Display the specified resource.
+     */
+    public function show($id)
+    {
+        $acc = Accuracy::with('grade')->find($id);
+
+        if (!$acc) {
+            return response()->json([
+                'detail' => 'Not found.'
+            ], 404);
+        }
+
+        return response()->json($this->formatAccuracy($acc));
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
@@ -96,11 +112,9 @@ class AccuracyController extends Controller
         }
         
         $accuracy = Accuracy::create($data);
+        $accuracy->load('grade');
 
-        return response()->json([
-            'message' => 'Accuracy created successfully',
-            'data' => $accuracy
-        ], 201);
+        return response()->json($this->formatAccuracy($accuracy), 201);
     }
 
     /**
@@ -112,16 +126,14 @@ class AccuracyController extends Controller
 
         if (!$accuracy) {
             return response()->json([
-                'message' => 'Accuracy not found'
+                'detail' => 'Not found.'
             ], 404);
         }
 
         $accuracy->update($request->all());
+        $accuracy->load('grade');
 
-        return response()->json([
-            'message' => 'Accuracy updated successfully',
-            'data' => $accuracy
-        ], 200);
+        return response()->json($this->formatAccuracy($accuracy), 200);
     }
 
     /**
@@ -133,15 +145,31 @@ class AccuracyController extends Controller
 
         if (!$accuracy) {
             return response()->json([
-                'message' => 'Accuracy not found'
+                'detail' => 'Not found.'
             ], 404);
         }
 
         $accuracy->delete();
 
-        return response()->json([
-            'message' => 'Accuracy deleted successfully'
-        ], 200);
+        return response()->noContent(204);
+    }
+
+    protected function formatAccuracy(Accuracy $acc): array
+    {
+        $grade = $acc->grade;
+        return [
+            'id' => $acc->id,
+            'grade_details' => $grade ? [
+                'id' => $grade->id,
+                'created' => $this->formatDateTime($grade->created),
+                'updated' => $this->formatDateTime($grade->updated),
+                'title' => $grade->title,
+                'description' => $grade->description,
+                'level' => (int)$grade->level,
+            ] : null,
+            'percentage' => (int)$acc->percentage,
+            'grade' => $acc->grade_id,
+        ];
     }
 
     /**

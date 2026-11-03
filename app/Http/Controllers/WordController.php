@@ -37,9 +37,12 @@ class WordController extends Controller
             $query->where('text', 'like', '%' . $search . '%');
         }
 
-
-        // Return paginated results (10 per page by default)
-        $words = $query->paginate($request->query('limit', 10));
+        // Return paginated results if page or limit requested, otherwise plain array to match DRF WordListViewSet
+        if ($request->has('page') || $request->has('limit')) {
+            $words = $query->paginate($request->query('limit', 10));
+        } else {
+            $words = $query->get();
+        }
 
         return response()->json($words, 200);
     }

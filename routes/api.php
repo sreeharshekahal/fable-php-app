@@ -23,6 +23,7 @@ use App\Http\Controllers\StudentBulkUpdateController;
 use App\Http\Controllers\AuthPasswordController;
 use App\Http\Controllers\AuthSessionController;
 use App\Http\Controllers\StudentAssessmentReportController;
+use App\Http\Controllers\LanguageController;
 
 
 /*
@@ -96,6 +97,9 @@ Route::middleware(['django.auth'])->prefix('students')->group(function () {
 Route::get('/students', [StudentController::class, 'getStudents']);
 Route::get('/students/{id}', [User::class, 'getStudent']);
 
+Route::get('/languages', [LanguageController::class, 'index']);
+Route::get('/languages/{id}', [LanguageController::class, 'show']);
+
 Route::middleware(['django.auth'])->group(function () {
     Route::delete('/students/{id}', [StudentController::class, 'deleteStudent']);
 
@@ -144,6 +148,7 @@ Route::middleware(['django.auth'])->group(function () {
         Route::get('/debug-grouping-parameters', [GroupingParameterController::class, 'debug']);
 
         Route::get('/accuracies', [AccuracyController::class, 'index']);
+        Route::get('/accuracies/{id}', [AccuracyController::class, 'show']);
         Route::post('/accuracies', [AccuracyController::class, 'store']);
         Route::put('/accuracies/{id}', [AccuracyController::class, 'update']);
         Route::patch('/accuracies/{id}', [AccuracyController::class, 'update']);
