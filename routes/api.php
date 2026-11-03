@@ -6,7 +6,6 @@ use App\Http\Controllers\User;
 use App\Http\Controllers\Dashboard;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AssessmentController;
-use App\Http\Controllers\AssessmentCountController;
 use App\Http\Controllers\OrganisationAnalyticsController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\OrganisationController;
@@ -37,9 +36,8 @@ use App\Http\Controllers\StudentAssessmentReportController;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+
+Route::middleware(['django.auth'])->get('/user', [AuthSessionController::class, 'user']);
 
 Route::middleware(['token.auth'])->group(function () {
     Route::put('/updateStudent/{id}', [User::class, 'updateStudent']);
@@ -62,37 +60,24 @@ Route::post('/add-student', [User::class, 'addStudent']);
 Route::post('/edit-student/{id}', [User::class, 'editStudent']);
 Route::post('/add-teacher', [User::class, 'addTeacher']);
 
-// Auth & Password Reset endpoints (Django rest-auth compatible)
+// Auth & Password Reset endpoints
 Route::prefix('rest-auth')->group(function () {
     Route::post('/login', [AuthSessionController::class, 'login']);
-    Route::post('/login/', [AuthSessionController::class, 'login']);
     Route::post('/password/reset', [AuthPasswordController::class, 'passwordReset']);
-    Route::post('/password/reset/', [AuthPasswordController::class, 'passwordReset']);
     Route::post('/password/reset/confirm', [AuthPasswordController::class, 'passwordResetConfirm']);
-    Route::post('/password/reset/confirm/', [AuthPasswordController::class, 'passwordResetConfirm']);
 
     Route::middleware(['django.auth'])->group(function () {
         Route::post('/logout', [AuthSessionController::class, 'logout']);
-        Route::post('/logout/', [AuthSessionController::class, 'logout']);
         Route::get('/user', [AuthSessionController::class, 'user']);
-        Route::get('/user/', [AuthSessionController::class, 'user']);
         Route::post('/password/change', [AuthPasswordController::class, 'passwordChange']);
-        Route::post('/password/change/', [AuthPasswordController::class, 'passwordChange']);
     });
 });
 
-// Non-prefixed aliases
-Route::post('/login', [AuthSessionController::class, 'login']);
-Route::post('/password/reset', [AuthPasswordController::class, 'passwordReset']);
-Route::post('/password/reset/confirm', [AuthPasswordController::class, 'passwordResetConfirm']);
-Route::post('/forgot-password/{uid}/{token}/', [AuthPasswordController::class, 'passwordResetConfirm']);
-
 Route::middleware(['django.auth'])->group(function () {
-    Route::post('/logout', [AuthSessionController::class, 'logout']);
-    Route::post('/password/change', [AuthPasswordController::class, 'passwordChange']);
     Route::middleware(['role:admin'])->group(function () {
         Route::get('/group-wise-distribution-per-grade', [OrganisationAnalyticsController::class, 'groupWiseDistributionPerGrade']);
         Route::delete('/bulk-delete-users', [UserController::class, 'bulkDeleteUsers']);
+        Route::delete('/bulk-delete-passages', [PassageController::class, 'bulkDeletePassages']);
         Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
     });
 
@@ -124,9 +109,9 @@ Route::middleware(['django.auth'])->group(function () {
     Route::get('/offline-data', [OrganisationController::class, 'offlineData']);
 
     Route::middleware(['role:admin,teacher'])->group(function () {
-        Route::get('/no-of-assessments-organisation-wise', [AssessmentCountController::class, 'organisationWise']);
-        Route::get('/no-of-assessments-grade-wise', [AssessmentCountController::class, 'gradeWise']);
-        Route::get('/no-of-assessments-group-wise', [AssessmentCountController::class, 'groupWise']);
+        Route::get('/no-of-assessments-organisation-wise', [OrganisationAnalyticsController::class, 'organisationWise']);
+        Route::get('/no-of-assessments-grade-wise', [OrganisationAnalyticsController::class, 'gradeWise']);
+        Route::get('/no-of-assessments-group-wise', [OrganisationAnalyticsController::class, 'groupWise']);
 
         Route::get('/grades', [GradeController::class, 'index']);
         Route::get('/grades/{id}', [GradeController::class, 'show']);
@@ -173,6 +158,7 @@ Route::middleware(['django.auth'])->group(function () {
         Route::put('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'update']);
         Route::delete('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'destroy']);
 
+        Route::delete('/bulk-delete-passages', [PassageController::class, 'bulkDeletePassages']);
         Route::patch('/passages/{id}', [PassageController::class, 'update']);
         Route::put('/passages/{id}', [PassageController::class, 'update']);
         Route::put('/passages/{id}/status', [PassageController::class, 'updateStatus']);

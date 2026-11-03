@@ -498,6 +498,50 @@ class PassageController extends Controller
     }
 
     /**
+     * Bulk delete passages.
+     * Matches Python Django implementation: bulk_delete_passage
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
+     */
+    public function bulkDeletePassages(Request $request)
+    {
+        if (!$request->has('passages') || $request->input('passages') === null || !is_array($request->input('passages'))) {
+            return response()->json([
+                'details' => 'passage not found'
+            ], 400);
+        }
+
+        $passages = $request->input('passages');
+
+        if (empty($passages)) {
+            return response()->noContent(204);
+        }
+
+        DB::transaction(function () use ($passages) {
+            // Find all assessments associated with these passages
+            $assessmentIds = DB::table('assessment_assessment')
+                ->whereIn('passage_id', $passages)
+                ->pluck('id');
+
+            if ($assessmentIds->isNotEmpty()) {
+                // Delete cascading dependent tables for these assessments
+                DB::table('assessment_errorwords')->whereIn('assessment_id', $assessmentIds)->delete();
+                DB::table('assessment_assessment_checklists')->whereIn('assessment_id', $assessmentIds)->delete();
+                DB::table('assessment_assessmentstudentgrouphistory')->whereIn('assessment_id', $assessmentIds)->delete();
+
+                // Delete assessments
+                DB::table('assessment_assessment')->whereIn('id', $assessmentIds)->delete();
+            }
+
+            // Delete passages
+            DB::table('passage_passage')->whereIn('id', $passages)->delete();
+        });
+
+        return response()->noContent(204);
+    }
+
+    /**
      * Format a single passage matching Django's PassageSerializer.
      *
      * @param  \App\Models\Passage  $passage
