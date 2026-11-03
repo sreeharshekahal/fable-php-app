@@ -20,11 +20,11 @@ class AccuracyController extends Controller
 
         $query = Accuracy::query();
 
-        if ($request->has('grade_id') || $request->has('grade')) {
+        if ($request->filled('grade') || $request->filled('grade_id')) {
             $query->where('common_accuracy.grade_id', $request->input('grade', $request->input('grade_id')));
         }
 
-        if ($request->has('grade_level') || $request->has('grade__level')) {
+        if ($request->filled('grade__level') || $request->filled('grade_level')) {
             $gradeLevel = $request->input('grade__level', $request->input('grade_level'));
             $query->whereHas('grade', function ($q) use ($gradeLevel) {
                 $q->where('level', $gradeLevel);

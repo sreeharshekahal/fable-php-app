@@ -23,24 +23,25 @@ class GroupingParameterController extends Controller
         $query = GroupingParameter::query(); // Base query from GroupingParameter model
 
         // add filters for grade_id
-        if ($request->has('grade_id') || $request->has('grade')) {
+        if ($request->filled('grade') || $request->filled('grade_id')) {
             $query->where('common_groupingparameter.grade_id', $request->input('grade', $request->input('grade_id')));
         }
 
         // add filters for language_id
-        if ($request->has('language_id')) {
+        if ($request->filled('language_id')) {
             $query->where('common_groupingparameter.language_id', $request->language_id);
         }
 
         // add filters for language__name
-        if ($request->has('language__name')) {
-            $query->whereHas('language', function ($q) use ($request) {
-                $q->where('name', $request->language__name);
+        if ($request->filled('language__name')) {
+            $languageName = $request->input('language__name');
+            $query->whereHas('language', function ($q) use ($languageName) {
+                $q->where('name', $languageName);
             });
         }
 
         // add filters for grade_level
-        if ($request->has('grade_level') || $request->has('grade__level')) {
+        if ($request->filled('grade__level') || $request->filled('grade_level')) {
             $gradeLevel = $request->input('grade__level', $request->input('grade_level'));
             $query->whereHas('grade', function ($q) use ($gradeLevel) {
                 $q->where('level', $gradeLevel);
