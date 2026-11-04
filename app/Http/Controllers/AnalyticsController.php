@@ -47,6 +47,21 @@ class AnalyticsController extends Controller
         }
     }
 
+    /**
+     * Word Trend Analysis
+     * Analyzes student assessment trends with optional date range and assessment period filtering.
+     *
+     * Query Parameters:
+     * - student / student_id / studentId / student__id: UUID (required)
+     * - grade / grade_id / gradeId: UUID or level number (required)
+     * - language__name / language / language_name: English, Hindi, etc. (default: English)
+     * - assessment_period / period / assessmentPeriod / assessment_period__iexact: BOY, MOY, EOY (default: empty shows all)
+     * - type: 0 (Progress Monitoring), 1 (Benchmarking) (default: 0 if no period specified)
+     * - from / to: dd-mm-yyyy date range filter
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function wordTrendAnalysis(Request $request)
     {
         // ============================================
@@ -56,7 +71,6 @@ class AnalyticsController extends Controller
         $language_name = $request->input('language__name', 'English');
         $from_date = $request->input('from', null);
         $to_date = $request->input('to', null);
-        $type = $request->input('type', 0);
         $grade_id = $request->input('grade', null);
 
         // Assessment period: accept only one of BOY, MOY, EOY; default empty shows all
@@ -68,6 +82,13 @@ class AnalyticsController extends Controller
                 $assessment_period = $candidate;
             }
         }
+
+        // Assessment type: Progress Monitoring (0) or Benchmarking (1)
+        // If type is explicitly passed, use it.
+        // If type is not passed, but assessment_period (BOY/MOY/EOY) is passed, do not restrict type so Benchmark assessments match.
+        // If neither is passed, default to Progress Monitoring (0) for backwards compatibility.
+        $hasType = $request->has('type');
+        $type = $hasType ? (int) $request->input('type') : null;
 
         // ============================================
         // 2. VALIDATE & PARSE DATE RANGE
@@ -132,10 +153,11 @@ class AnalyticsController extends Controller
         // Decrypt names
         $firstName = $this->tryDecrypt($student->user->first_name);
         $lastName  = $this->tryDecrypt($student->user->last_name);
+        $resolvedType = $type !== null ? $type : ($assessment_period !== null ? 1 : 0);
         $data = [
             'student_id' => $student->id,
             'student_name' => trim($firstName . ' ' . $lastName),
-            'assessment_type' => (int) $type,
+            'assessment_type' => (int) $resolvedType,
             'grade' => (int) $grade->level,
             'assessment_period' => $assessment_period,
             'accuracy' => $accuracy,
@@ -155,11 +177,17 @@ class AnalyticsController extends Controller
         // ============================================
         $baseQuery = Assessment::with(['passage', 'checklists', 'errorWords', 'group'])
             ->where('student_id', $student_id)
-            ->where('type', $type)
             ->where('grade_id', $grade_id)
             ->whereHas('passage', function ($query) use ($language) {
                 $query->where('language_id', $language->id);
             });
+
+        if ($type !== null) {
+            $baseQuery->where('type', $type);
+        } elseif ($assessment_period === null) {
+            // Default legacy behavior: Progress Monitoring (0)
+            $baseQuery->where('type', 0);
+        }
 
         // ============================================
         // 5b. APPLY ASSESSMENT PERIOD FILTER IF PROVIDED
@@ -167,7 +195,7 @@ class AnalyticsController extends Controller
         if ($assessment_period !== null) {
             $baseQuery->where(function ($q) use ($assessment_period) {
                 $q->where('assessment_period', $assessment_period)
-                  ->orWhereRaw('UPPER(assessment_period) = ?', [$assessment_period]);
+                    ->orWhereRaw('UPPER(assessment_period) = ?', [$assessment_period]);
             });
         }
 
