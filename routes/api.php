@@ -94,7 +94,6 @@ Route::middleware(['token.auth'])->group(function () {
     Route::put('/updateTeacher/{id}', [User::class, 'updateTeacher']);
     Route::get('/getCounts', [Dashboard::class, 'getCounts']);
     Route::get('/getTeacher/{id}', [User::class, 'getTeacher']);
-    Route::get('/me', [UserController::class, 'me']);
 });
 
 /*
@@ -105,6 +104,7 @@ Route::middleware(['token.auth'])->group(function () {
 Route::middleware(['django.auth'])->group(function () {
     // Current authenticated user aliases
     Route::get('/user', [AuthSessionController::class, 'user']);
+    Route::get('/me', [UserController::class, 'me']);
     Route::get('/group-wise-users', [UserController::class, 'groupWiseUsers']);
     Route::get('/offline-data', [OrganisationController::class, 'offlineData']);
 
