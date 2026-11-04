@@ -158,8 +158,8 @@ class StudentAssessmentReportService
 
         // 6. Filter by Assessment Period
         $periodParam = $filters instanceof Request
-            ? $filters->get('assessment_period', $filters->get('period', null))
-            : ($filters['assessment_period'] ?? $filters['period'] ?? null);
+            ? $filters->get('assessment_period', $filters->get('period', $filters->get('assessment_period__iexact', null)))
+            : ($filters['assessment_period'] ?? $filters['period'] ?? $filters['assessment_period__iexact'] ?? null);
 
         $normalizedPeriod = $this->normalizePeriod($periodParam);
 

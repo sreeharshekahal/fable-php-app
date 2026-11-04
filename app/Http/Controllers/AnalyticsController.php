@@ -59,6 +59,16 @@ class AnalyticsController extends Controller
         $type = $request->input('type', 0);
         $grade_id = $request->input('grade', null);
 
+        // Assessment period: accept only one of BOY, MOY, EOY; default empty shows all
+        $rawPeriod = $request->input('assessment_period', $request->input('period', $request->input('assessment_period__iexact', null)));
+        $assessment_period = null;
+        if (!empty($rawPeriod)) {
+            $candidate = strtoupper(trim((string) $rawPeriod));
+            if (in_array($candidate, ['BOY', 'MOY', 'EOY'], true)) {
+                $assessment_period = $candidate;
+            }
+        }
+
         // ============================================
         // 2. VALIDATE & PARSE DATE RANGE
         // ============================================
@@ -127,6 +137,7 @@ class AnalyticsController extends Controller
             'student_name' => trim($firstName . ' ' . $lastName),
             'assessment_type' => (int) $type,
             'grade' => (int) $grade->level,
+            'assessment_period' => $assessment_period,
             'accuracy' => $accuracy,
             'no_of_assessments' => $no_of_assessments,
             'stats_exists' => false,
@@ -151,6 +162,16 @@ class AnalyticsController extends Controller
             });
 
         // ============================================
+        // 5b. APPLY ASSESSMENT PERIOD FILTER IF PROVIDED
+        // ============================================
+        if ($assessment_period !== null) {
+            $baseQuery->where(function ($q) use ($assessment_period) {
+                $q->where('assessment_period', $assessment_period)
+                  ->orWhereRaw('UPPER(assessment_period) = ?', [$assessment_period]);
+            });
+        }
+
+        // ============================================
         // 6. APPLY DATE FILTER IF PROVIDED
         // ============================================
         if ($flag === true) {
@@ -171,8 +192,8 @@ class AnalyticsController extends Controller
             ->limit(5)
             ->get();
 
-        // Format stats - Python only returns 4 fields
-        $stats = $topAssessments->map(function ($assessment) use ($student, $language, $grade_id) {
+        // Format stats - Python only returns 4 fields (plus assessment_period)
+        $stats = $topAssessments->map(function ($assessment) use ($student, $language, $grade_id, $assessment_period) {
             $score = (float)(($assessment->last_word_index + 1) - $assessment->no_error_words);
 
             // Resolve the level_id for this specific assessment.
@@ -193,6 +214,8 @@ class AnalyticsController extends Controller
                 $assessmentLevelId = $studentGroup ? $studentGroup->level_id : null;
             }
 
+            $targetPeriod = $assessment->assessment_period ?: $assessment_period;
+
             $dynamicGoal = 0;
             if ($assessment->benchmark_goal > 0) {
                 $dynamicGoal = $assessment->benchmark_goal;
@@ -202,7 +225,7 @@ class AnalyticsController extends Controller
                     $language->id ?? $assessment->passage->language_id,
                     $assessment->grade_id ?? $grade_id,
                     $assessmentLevelId,
-                    $assessment->assessment_period
+                    $targetPeriod
                 );
             }
 
@@ -211,6 +234,7 @@ class AnalyticsController extends Controller
                 'passage__passage_name' => $assessment->passage->passage_name,
                 'goal' => $dynamicGoal,
                 'score' => $score,
+                'assessment_period' => $assessment->assessment_period,
             ];
         });
 
