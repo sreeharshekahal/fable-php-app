@@ -43,9 +43,10 @@ class TeacherAuth
         }
 
         // Attach user to request for use in controllers
-        $request->merge(['authenticated_user' => $authToken->user]);
-
-        // Also set in Laravel's auth system for convenience
+        $request->attributes->set('authenticated_user', $authToken->user);
+        $request->setUserResolver(function () use ($authToken) {
+            return $authToken->user;
+        });
         auth()->setUser($authToken->user);
 
         // ============================================

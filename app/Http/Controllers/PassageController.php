@@ -144,7 +144,7 @@ class PassageController extends Controller
         }
 
         $total = $query->count('passage_passage.id');
-        $limit = (int) $request->query('limit', 10);
+        $limit = (int) $request->query('limit', 50);
         $offset = (int) $request->query('offset', 0);
 
         $passages = $query->offset($offset)->limit($limit)->get();
@@ -178,6 +178,7 @@ class PassageController extends Controller
         }
 
         $queryParams = $request->query();
+        unset($queryParams['authenticated_user']);
 
         $nextUrl = null;
         if ($offset + $limit < $total) {

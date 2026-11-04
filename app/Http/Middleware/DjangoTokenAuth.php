@@ -41,7 +41,11 @@ class DjangoTokenAuth
 
         $user = $authToken->user;
         auth()->setUser($user);
-        $request->merge(['authenticated_user' => $user]);
+        $request->setUserResolver(function () use ($user) {
+            return $user;
+        });
+        $request->attributes->set('authenticated_user', $user);
+        $request->attributes->set('django_token', $token);
 
         return $next($request);
     }

@@ -12,9 +12,11 @@ class TokenAuth
     /**
      * Handle an incoming request.
      *
+     * Supports both Static API token and Django Auth Tokens
+     *
      * @param  \Illuminate\Http\Request  $request
      * @param  \Closure  $next
-     * @return mixed
+     * @return \Symfony\Component\HttpFoundation\Response
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -35,25 +37,26 @@ class TokenAuth
             return response()->json(['error' => 'Unauthorized - Invalid authorization format'], 401);
         }
 
-        // Define your static token
+        // 1. Check if the token matches the static API token
         $staticToken = env('API_TOKEN');
-
-        // First, check if the token matches the static token
-        if ($staticToken && $token === $staticToken) {
+        if (!empty($staticToken) && is_string($staticToken) && hash_equals($staticToken, $token)) {
             return $next($request);
         }
 
-        // Otherwise, check if it's a dynamic Django token
+        // 2. Check if it's a dynamic Django auth token
         $authToken = AuthToken::with('user')->where('key', $token)->first();
 
-        if ($authToken) {
+        if ($authToken && $authToken->user) {
             $user = $authToken->user;
             auth()->setUser($user);
-            $request->merge(['authenticated_user' => $user]);
+            $request->setUserResolver(function () use ($user) {
+                return $user;
+            });
+            $request->attributes->set('authenticated_user', $user);
+
             return $next($request);
         }
 
         return response()->json(['error' => 'Unauthorized - Invalid token'], 401);
     }
 }
-
