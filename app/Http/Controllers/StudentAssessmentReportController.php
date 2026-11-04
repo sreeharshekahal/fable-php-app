@@ -23,6 +23,7 @@ class StudentAssessmentReportController extends Controller
      * - Filters:
      *   - language / languages__name: English, Hindi, Marathi, etc.
      *   - assessment_period / period: ALL, BOY, MOY, EOY (default: ALL)
+     *   - academic_year / year: YYYY-YY (default: current academic year e.g. 2026-27)
      *   - retell_and_fluency / retell_fluency: true/false (default: true)
      *   - trend_analysis: true/false (default: true)
      *   - audio_link / audio: true/false (default: true)

@@ -125,19 +125,30 @@ class StudentAssessmentReportService
         }
         $groupTitle = $groupTitle ?: 'General Group';
 
-        // 4. Fetch all assessments for this student and language
+        // 4. Resolve Academic Year (defaults to current active academic year with April cut-off: 2026-27 even in Jan–Apr 2027)
+        $academicYearInfo = $this->calculateAcademicYearInfo(collect([]), $filters);
+        $academicYear = $academicYearInfo['academic_year'];
+        $targetYear = $academicYearInfo['start_year'];
+
+        // Academic year spans across both years: $targetYear and $targetYear + 1 (e.g. both 2026 and 2027 up to April 30)
+        // Academic cycle starts in $targetYear and runs through April 30 of $targetYear + 1
+        $startOfCycle = Carbon::create($targetYear, 1, 1, 0, 0, 0, 'Asia/Kolkata')->startOfDay();
+        $endOfCycle = Carbon::create($targetYear + 1, 4, 30, 23, 59, 59, 'Asia/Kolkata')->endOfDay();
+
+        // 5. Fetch assessments for the academic year directly from database (having both years e.g. 2026 and 2027)
         $assessmentsQuery = DB::table('assessment_assessment as a')
             ->join('passage_passage as p', 'a.passage_id', '=', 'p.id')
             ->leftJoin('common_grade as pgrade', 'p.grade_id', '=', 'pgrade.id')
             ->leftJoin('common_grade as agrade', 'a.grade_id', '=', 'agrade.id')
             ->leftJoin('organisation_group as grp', 'a.group_id', '=', 'grp.id')
-            ->where('a.student_id', $student->id);
+            ->where('a.student_id', $student->id)
+            ->whereBetween('a.created', [$startOfCycle, $endOfCycle]);
 
         if ($languageId) {
             $assessmentsQuery->where('p.language_id', $languageId);
         }
 
-        $allRawAssessments = $assessmentsQuery->select(
+        $rawAssessments = $assessmentsQuery->select(
             'a.*',
             'p.passage_name',
             'p.number as passage_number',
@@ -151,10 +162,26 @@ class StudentAssessmentReportService
             'grp.level_id as assessment_group_level_id'
         )->orderBy('a.created', 'asc')->get();
 
-        // 5. Academic Year Calculation Logic
-        $academicYearInfo = $this->calculateAcademicYearInfo($allRawAssessments);
-        $academicYear = $academicYearInfo['academic_year'];
-        $academicYearAssessments = $academicYearInfo['assessments'];
+        // Resolve cycle start (first BOY in targetYear if present, otherwise startOfCycle)
+        $boyInTargetYear = $rawAssessments->filter(function ($a) use ($targetYear) {
+            $created = Carbon::parse($a->created, 'Asia/Kolkata');
+            $period = $this->normalizePeriod($a->assessment_period);
+            return $created->year === $targetYear && $period === 'BOY';
+        })->sortBy('created')->values();
+
+        $cycleStartDate = $boyInTargetYear->isNotEmpty()
+            ? Carbon::parse($boyInTargetYear->first()->created, 'Asia/Kolkata')
+            : $startOfCycle;
+
+        // An academic year (e.g. 2026-27) includes both 2026 and 2027 assessments:
+        // Assessments created from cycle start in targetYear through April 30 of targetYear + 1
+        $academicYearAssessments = $rawAssessments->filter(function ($a) use ($cycleStartDate, $endOfCycle) {
+            $created = Carbon::parse($a->created, 'Asia/Kolkata');
+            if ($created->lt($cycleStartDate) || $created->gt($endOfCycle)) {
+                return false;
+            }
+            return true;
+        })->values();
 
         // 6. Filter by Assessment Period
         $periodParam = $filters instanceof Request
@@ -291,66 +318,46 @@ class StudentAssessmentReportService
     }
 
     /**
-     * Calculate Academic Year according to exact business logic:
-     * - Academic year runs from first BOY through last EOY.
-     * - If new BOY starts in different calendar year, academic year changes and only new BOY data displays.
-     * - Academic year format is static "YYYY-YYYY" (e.g. 2026-2027) regardless of assessment period.
+     * Calculate Academic Year according to current academic year business logic:
+     * - School academic years span across calendar years (e.g. 2026-27).
+     * - Cut-off month is April:
+     *   - Before or on April 30 of a year (month <= 4), the active academic year started in the previous year
+     *     (e.g., in Jan–Apr 2027, the academic year is still 2026-27).
+     *   - Past April (May 1 onwards, month > 4), the active academic year started in the current year
+     *     (e.g., in May–Dec 2026 -> 2026-27; in May–Dec 2027 -> 2027-28).
+     * - Always formatted as YYYY-YY (e.g. 2026-27).
+     * - Optionally accepts an explicit academic_year / year filter via $filters.
      */
-    public function calculateAcademicYearInfo(Collection $assessments): array
+    public function calculateAcademicYearInfo(Collection $assessments, $filters = null): array
     {
-        $currentYear = Carbon::now('Asia/Kolkata')->year;
+        $now = Carbon::now('Asia/Kolkata');
+        // If current month is on or before April (months 1-4), we are still in the cycle that began the previous calendar year.
+        // Once past April (month >= 5 / May onwards), the new academic year cycle begins.
+        $defaultStartYear = $now->month <= 4 ? ($now->year - 1) : $now->year;
 
-        // Find all BOY assessments, sorted chronologically
-        $boyAssessments = $assessments->filter(function ($a) {
-            $p = $this->normalizePeriod($a->assessment_period);
-            return $p === 'BOY';
-        })->sortBy('created')->values();
+        // Check if an explicit academic year or year filter was passed
+        $requestedYear = null;
+        if ($filters) {
+            $ayParam = $filters instanceof Request
+                ? $filters->get('academic_year', $filters->get('year', null))
+                : ($filters['academic_year'] ?? $filters['year'] ?? null);
 
-        // If no BOY assessments exist, fall back to earliest assessment or current calendar year
-        if ($boyAssessments->isEmpty()) {
-            $earliest = $assessments->sortBy('created')->first();
-            $startYear = $earliest ? Carbon::parse($earliest->created)->year : $currentYear;
-            $academicYear = $startYear . '-' . ($startYear + 1);
-
-            return [
-                'academic_year' => $academicYear,
-                'start_year' => $startYear,
-                'assessments' => $assessments,
-            ];
+            if ($ayParam) {
+                if (preg_match('/^(\d{4})/', trim((string)$ayParam), $m)) {
+                    $requestedYear = (int)$m[1];
+                }
+            }
         }
 
-        // Group BOY assessments by calendar year
-        $boyByYear = $boyAssessments->groupBy(function ($a) {
-            return Carbon::parse($a->created)->year;
-        })->sortKeys();
-
-        // Latest BOY calendar year represents the current active academic year
-        $latestBoyYear = $boyByYear->keys()->last();
-        $academicYear = $latestBoyYear . '-' . ($latestBoyYear + 1);
-
-        // Find the timestamp of the first BOY in this latest BOY calendar year
-        $firstBoyOfCurrentCycle = $boyByYear->get($latestBoyYear)->first();
-        $cycleStartDate = Carbon::parse($firstBoyOfCurrentCycle->created);
-
-        // Academic year data: all assessments created on or after the first BOY of this year
-        // and before any subsequent BOY year (if future years exist)
-        $cycleAssessments = $assessments->filter(function ($a) use ($cycleStartDate, $latestBoyYear) {
-            $created = Carbon::parse($a->created);
-            if ($created->lt($cycleStartDate)) {
-                return false;
-            }
-            // If another BOY exists in a strictly later calendar year, stop before that
-            $period = $this->normalizePeriod($a->assessment_period);
-            if ($created->year > $latestBoyYear && $period === 'BOY') {
-                return false;
-            }
-            return true;
-        })->values();
+        // Active academic year defaults to the current active cycle
+        $targetYear = $requestedYear ?: $defaultStartYear;
+        // Always format as YYYY-YY (e.g. 2026-27, 2027-28)
+        $academicYear = $targetYear . '-' . substr((string) ($targetYear + 1), -2);
 
         return [
             'academic_year' => $academicYear,
-            'start_year' => $latestBoyYear,
-            'assessments' => $cycleAssessments,
+            'start_year' => $targetYear,
+            'assessments' => $assessments,
         ];
     }
 
