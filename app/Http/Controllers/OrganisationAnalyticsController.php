@@ -142,15 +142,19 @@ class OrganisationAnalyticsController extends Controller
         foreach ($groups as $group) {
             $total = (int) $group->students_count;
             $denominator = (int) ($totals[$group->grade_id] ?? 0);
-            $result[(string) $group->grade->level] = [
+            $result[(int) $group->grade->level] = [
                 'grade' => $group->grade_id,
                 'group' => $group->id,
-                'grade__level' => $group->grade->level,
+                'grade__level' => (int) $group->grade->level,
                 'group__title' => $group->title,
                 'total' => $total,
                 'percentage' => $denominator === 0 ? 0.0 : $total / $denominator * 100,
             ];
         }
+
+        // Sort by grade level in ascending order
+        ksort($result, SORT_NUMERIC);
+
         return response()->json(array_values($result));
     }
 }
