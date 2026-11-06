@@ -40,7 +40,7 @@ class WordCategorizationService
     {
         $fry = Fry::where('word', $word->text)->first();
         if ($fry) {
-            WordSightMap::updateOrCreate(
+            WordSightMap::firstOrCreate(
                 ['word_id' => $word->id, 'sight_word_id' => $fry->sight_id],
                 ['id' => (string) Str::uuid()]
             );
@@ -61,7 +61,7 @@ class WordCategorizationService
 
         foreach ($substrings as $st) {
             if (str_starts_with($word->text, $st)) {
-                WordMorphemeMap::updateOrCreate(
+                WordMorphemeMap::firstOrCreate(
                     ['word_id' => $word->id, 'morpheme_id' => $morphemePrefix->id],
                     ['id' => (string) Str::uuid()]
                 );
@@ -83,7 +83,7 @@ class WordCategorizationService
 
         foreach ($substrings as $st) {
             if (str_ends_with($word->text, $st)) {
-                WordMorphemeMap::updateOrCreate(
+                WordMorphemeMap::firstOrCreate(
                     ['word_id' => $word->id, 'morpheme_id' => $morphemeSuffix->id],
                     ['id' => (string) Str::uuid()]
                 );
@@ -139,7 +139,7 @@ class WordCategorizationService
                 }
 
                 if ($flag1 && $flag2) {
-                    WordPhonicMap::updateOrCreate(
+                    WordPhonicMap::firstOrCreate(
                         ['word_id' => $word->id, 'phonic_id' => $phonic->id],
                         ['id' => (string) Str::uuid()]
                     );
@@ -161,7 +161,7 @@ class WordCategorizationService
                 if (!in_array($char0, $this->vowels) && !in_array($char2, $this->vowels)) {
                     $cvc = Phonic::where('subcategory_code', 'cvc')->first();
                     if ($cvc) {
-                        WordPhonicMap::updateOrCreate(
+                        WordPhonicMap::firstOrCreate(
                             ['word_id' => $word->id, 'phonic_id' => $cvc->id],
                             ['id' => (string) Str::uuid()]
                         );
@@ -221,7 +221,7 @@ class WordCategorizationService
                 }
 
                 if ($flag1 && $flag2) {
-                    WordPhonicMap::updateOrCreate(
+                    WordPhonicMap::firstOrCreate(
                         ['word_id' => $word->id, 'phonic_id' => $phonic->id],
                         ['id' => (string) Str::uuid()]
                     );
@@ -270,7 +270,7 @@ class WordCategorizationService
                 }
 
                 if ($flag1 && $flag2) {
-                    WordPhonicMap::updateOrCreate(
+                    WordPhonicMap::firstOrCreate(
                         ['word_id' => $word->id, 'phonic_id' => $phonic->id],
                         ['id' => (string) Str::uuid()]
                     );
@@ -291,7 +291,7 @@ class WordCategorizationService
             if (mb_substr($word->text, $len - 1, 1) === 'e' &&
                 !in_array(mb_substr($word->text, $len - 2, 1), $this->vowels) &&
                 in_array(mb_substr($word->text, $len - 3, 1), $this->vowels)) {
-                WordPhonicMap::updateOrCreate(
+                WordPhonicMap::firstOrCreate(
                     ['word_id' => $word->id, 'phonic_id' => $phonic->id],
                     ['id' => (string) Str::uuid()]
                 );
@@ -311,7 +311,7 @@ class WordCategorizationService
                 $offset = str_ends_with($word->text, 'les') ? 3 : 2;
                 if (!in_array(mb_substr($word->text, $len - ($offset + 1), 1), $this->vowels) &&
                     !in_array(mb_substr($word->text, $len - $offset, 1), $this->vowels)) {
-                    WordPhonicMap::updateOrCreate( // Fixed typo
+                    WordPhonicMap::firstOrCreate(
                         ['word_id' => $word->id, 'phonic_id' => $phonic->id],
                         ['id' => (string) Str::uuid()]
                     );
@@ -329,7 +329,7 @@ class WordCategorizationService
         $len = mb_strlen($word->text);
         for ($i = 0; $i < $len - 1; $i++) {
             if (in_array(mb_substr($word->text, $i, 1), $this->vowels) && mb_substr($word->text, $i + 1, 1) === 'r') {
-                WordPhonicMap::updateOrCreate(
+                WordPhonicMap::firstOrCreate(
                     ['word_id' => $word->id, 'phonic_id' => $phonic->id],
                     ['id' => (string) Str::uuid()]
                 );

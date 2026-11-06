@@ -9,12 +9,17 @@ class WordSightMap extends Model
     protected $table = 'passage_wordsightmap';
     protected $keyType = 'string';
     public $incrementing = false;
-    public $timestamps = false;
+    public $timestamps = true;
+
+    const CREATED_AT = 'created';
+    const UPDATED_AT = 'updated';
 
     protected $fillable = [
         'id',
         'word_id',
         'sight_word_id',
+        'created',
+        'updated',
     ];
 
     public function word()
@@ -27,3 +32,4 @@ class WordSightMap extends Model
         return $this->belongsTo(Sight::class, 'sight_word_id');
     }
 }
+
