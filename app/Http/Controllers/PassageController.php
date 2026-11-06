@@ -321,6 +321,136 @@ class PassageController extends Controller
     }
 
     /**
+     * Create a new passage.
+     * Matches Python Django implementation: PassageViewSet.create
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'passage_name' => 'required|string|max:30',
+            'grade' => 'required_without:grade_id',
+            'grade_id' => 'required_without:grade',
+            'content' => 'sometimes|nullable|string',
+            'raw_content' => 'sometimes|nullable|string',
+            'readability_score' => 'sometimes|nullable|numeric',
+            'language' => 'sometimes|nullable',
+            'language_id' => 'sometimes|nullable',
+            'status' => 'sometimes|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+
+        // Handle grade resolution
+        $gradeInput = $request->input('grade', $request->input('grade_id'));
+        $grade = null;
+        if (is_string($gradeInput) && Str::isUuid($gradeInput)) {
+            $grade = Grade::find($gradeInput);
+        } elseif (is_numeric($gradeInput)) {
+            $grade = Grade::where('level', (int) $gradeInput)->first();
+        }
+        if (!$grade) {
+            return response()->json([
+                'grade' => ['The selected grade is invalid.']
+            ], 400);
+        }
+
+        // Handle language resolution
+        $language = null;
+        if ($request->filled('language') || $request->filled('language_id')) {
+            $langInput = $request->input('language', $request->input('language_id'));
+            if (is_string($langInput) && Str::isUuid($langInput)) {
+                $language = Language::find($langInput);
+            } elseif (is_string($langInput)) {
+                $language = Language::where('name', 'ILIKE', $langInput)->first();
+            }
+            if (!$language) {
+                return response()->json([
+                    'language' => ['The selected language is invalid.']
+                ], 400);
+            }
+        } else {
+            $language = Language::where('name', 'ILIKE', 'English')->first();
+        }
+
+        // Resolve created_by_id (Admin ID)
+        $user = $request->user() ?? $request->attributes->get('authenticated_user');
+        $createdById = null;
+        if ($user) {
+            $admin = DB::table('access_admin')->where('user_id', $user->id)->first();
+            if ($admin) {
+                $createdById = $admin->id;
+            }
+        }
+        if (!$createdById) {
+            $requestedCreatedBy = $request->input('created_by', $request->input('created_by_id'));
+            if ($requestedCreatedBy && DB::table('access_admin')->where('id', $requestedCreatedBy)->exists()) {
+                $createdById = $requestedCreatedBy;
+            } else {
+                $createdById = DB::table('access_admin')->value('id');
+            }
+        }
+
+        // Auto-increment passage number per grade (matching Django Passage.save)
+        $lastNumber = Passage::where('grade_id', $grade->id)->max('number');
+        $number = $lastNumber ? ((int) $lastNumber + 1) : 1;
+
+        $content = $request->input('content', $request->input('raw_content', ''));
+        $rawContent = $request->input('raw_content', $content);
+        $readabilityScore = (float) $request->input('readability_score', 0);
+        $status = $request->has('status') ? filter_var($request->input('status'), FILTER_VALIDATE_BOOLEAN) : true;
+
+        $passageData = [
+            'id' => (string) Str::uuid(),
+            'passage_name' => $request->input('passage_name'),
+            'content' => $content,
+            'raw_content' => $rawContent,
+            'readability_score' => $readabilityScore,
+            'grade_id' => $grade->id,
+            'language_id' => $language ? $language->id : null,
+            'number' => $number,
+            'created_by_id' => $createdById,
+            'created' => now(),
+            'updated' => now(),
+        ];
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('passage_passage', 'status')) {
+            $passageData['status'] = $status;
+        }
+
+        $passage = Passage::create($passageData);
+
+        // Run word categorization (matching Django post_save signal)
+        $langName = $language ? $language->name : 'English';
+        $words = $this->categorizationService->getWordsFromPassage($content ?: $rawContent, $langName);
+        $uniqueWords = array_unique($words);
+        foreach ($uniqueWords as $text) {
+            $trimmed = trim($text);
+            if (empty($trimmed)) {
+                continue;
+            }
+            $wordRecord = PassageWord::where('text', $trimmed)->first();
+            if (!$wordRecord) {
+                $wordRecord = PassageWord::create([
+                    'id' => (string) Str::uuid(),
+                    'text' => $trimmed,
+                    'created' => now(),
+                    'updated' => now(),
+                ]);
+                $this->categorizationService->categorize($wordRecord);
+            }
+        }
+
+        $passage->load(['grade', 'language']);
+
+        return response()->json($this->formatPassageResponse($passage), 201);
+    }
+
+    /**
      * Update a passage.
      * Matches Python Django implementation: PassageViewSet.update
      *

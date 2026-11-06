@@ -14,6 +14,8 @@ class PassageWord extends Model
     protected $fillable = [
         'id',
         'text',
+        'created',
+        'updated',
     ];
 }
 

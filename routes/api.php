@@ -149,6 +149,7 @@ Route::middleware(['django.auth'])->group(function () {
         Route::delete('/benchmark-templates/{id}', [BenchmarkTemplateController::class, 'destroy']);
 
         // Passage Management
+        Route::post('/passages', [PassageController::class, 'store']);
         Route::match(['put', 'patch'], '/passages/{id}', [PassageController::class, 'update']);
         Route::put('/passages/{id}/status', [PassageController::class, 'updateStatus']);
     });
