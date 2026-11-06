@@ -132,12 +132,12 @@ Route::middleware(['django.auth'])->group(function () {
         Route::get('/debug-grouping-parameters', [GroupingParameterController::class, 'debug']);
 
         // Accuracies
-        Route::get('/accuracies', [AccuracyController::class, 'index']);
-        Route::get('/accuracies/{id}', [AccuracyController::class, 'show']);
-        Route::post('/accuracies', [AccuracyController::class, 'store']);
-        Route::match(['put', 'patch'], '/accuracies/{id}', [AccuracyController::class, 'update']);
-        Route::delete('/accuracies/{id}', [AccuracyController::class, 'destroy']);
-        Route::get('/debug-accuracies', [AccuracyController::class, 'debug']);
+        // Route::get('/accuracies', [AccuracyController::class, 'index']);
+        // Route::get('/accuracies/{id}', [AccuracyController::class, 'show']);
+        // Route::post('/accuracies', [AccuracyController::class, 'store']);
+        // Route::match(['put', 'patch'], '/accuracies/{id}', [AccuracyController::class, 'update']);
+        // Route::delete('/accuracies/{id}', [AccuracyController::class, 'destroy']);
+        // Route::get('/debug-accuracies', [AccuracyController::class, 'debug']);
 
         // Benchmark Templates
         Route::get('/benchmark-templates', [BenchmarkTemplateController::class, 'index']);

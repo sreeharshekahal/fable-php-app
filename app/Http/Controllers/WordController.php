@@ -21,7 +21,7 @@ class WordController extends Controller
     }
 
     /**
-     * Display a listing of words.
+     * Display a listing of words with pagination.
      * Matches Python Django implementation: WordListViewSet
      *
      * @param  Request $request
@@ -37,14 +37,44 @@ class WordController extends Controller
             $query->where('text', 'like', '%' . $search . '%');
         }
 
-        // Return paginated results if page or limit requested, otherwise plain array to match DRF WordListViewSet
-        if ($request->has('page') || $request->has('limit')) {
-            $words = $query->paginate($request->query('limit', 10));
-        } else {
-            $words = $query->get();
+        $total = $query->count();
+        $limit = (int) ($request->query('limit') ?? $request->query('page_size') ?? 50);
+        $offset = (int) $request->query('offset', 0);
+
+        if ($request->has('page') && !$request->has('offset')) {
+            $offset = max(0, ((int) $request->query('page') - 1) * $limit);
         }
 
-        return response()->json($words, 200);
+        $words = $query->offset($offset)->limit($limit)->get();
+
+        $queryParams = $request->query();
+        unset($queryParams['authenticated_user']);
+
+        $nextUrl = null;
+        if ($offset + $limit < $total) {
+            $nextUrl = $request->fullUrlWithQuery(array_merge($queryParams, [
+                'limit' => $limit,
+                'offset' => $offset + $limit,
+            ]));
+        }
+
+        $prevUrl = null;
+        if ($offset > 0) {
+            $prevOffset = max(0, $offset - $limit);
+            $prevUrl = $request->fullUrlWithQuery(array_merge($queryParams, [
+                'limit' => $limit,
+                'offset' => $prevOffset,
+            ]));
+        }
+
+        return response()->json([
+            'count' => $total,
+            'next' => $nextUrl,
+            'next_url' => $nextUrl,
+            'previous' => $prevUrl,
+            'previous_url' => $prevUrl,
+            'results' => $words,
+        ], 200);
     }
 
     /**

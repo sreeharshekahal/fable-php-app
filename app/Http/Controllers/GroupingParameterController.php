@@ -17,8 +17,12 @@ class GroupingParameterController extends Controller
     {
         // $isAdmin = $request->has('is_admin') ? filter_var($request->get('is_admin'), FILTER_VALIDATE_BOOLEAN) : false;
         $isAdmin = false; // Make sure always excludes archived grades (level 6)
-        $limit = $request->input('limit');
-        $offset = $request->input('offset', 0);
+        $limit = (int) ($request->input('limit') ?? $request->input('page_size') ?? 50);
+        $offset = (int) $request->input('offset', 0);
+
+        if ($request->has('page') && !$request->has('offset')) {
+            $offset = max(0, ((int) $request->input('page') - 1) * $limit);
+        }
 
         $query = GroupingParameter::query(); // Base query from GroupingParameter model
 
@@ -64,9 +68,7 @@ class GroupingParameterController extends Controller
         $totalCount = $query->count(); // Get total count
 
         // add limit and offset for pagination
-        if ($limit) {
-            $query->skip($offset)->take($limit);
-        }
+        $query->skip($offset)->take($limit);
 
         // load the relations
         $parameters = $query->with(['level', 'grade', 'language'])->get();
@@ -104,19 +106,31 @@ class GroupingParameterController extends Controller
             ];
         });
 
+        $queryParams = $request->query();
+        unset($queryParams['authenticated_user']);
+
         $nextUrl = null;
-        if ($limit && ($offset + $limit) < $totalCount) {
-            $nextUrl = $request->fullUrlWithQuery(['offset' => $offset + $limit]);
+        if ($offset + $limit < $totalCount) {
+            $nextUrl = $request->fullUrlWithQuery(array_merge($queryParams, [
+                'limit' => $limit,
+                'offset' => $offset + $limit,
+            ]));
         }
         $prevUrl = null;
         if ($offset > 0) {
-            $prevUrl = $request->fullUrlWithQuery(['offset' => max(0, $offset - ($limit ?? 10))]);
+            $prevOffset = max(0, $offset - $limit);
+            $prevUrl = $request->fullUrlWithQuery(array_merge($queryParams, [
+                'limit' => $limit,
+                'offset' => $prevOffset,
+            ]));
         }
 
         return response()->json([
             'count' => $totalCount,
             'next' => $nextUrl,
+            'next_url' => $nextUrl,
             'previous' => $prevUrl,
+            'previous_url' => $prevUrl,
             'results' => $formatted
         ]);
     }
@@ -294,7 +308,7 @@ class GroupingParameterController extends Controller
         if (!isset($data['id'])) {
             $data['id'] = (string) Str::uuid();
         }
-        
+
         $groupingParameter = GroupingParameter::create($data);
 
         return response()->json([
