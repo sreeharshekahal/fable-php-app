@@ -70,9 +70,7 @@ class WordController extends Controller
         return response()->json([
             'count' => $total,
             'next' => $nextUrl,
-            'next_url' => $nextUrl,
             'previous' => $prevUrl,
-            'previous_url' => $prevUrl,
             'results' => $words,
         ], 200);
     }

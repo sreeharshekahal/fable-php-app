@@ -128,9 +128,7 @@ class GroupingParameterController extends Controller
         return response()->json([
             'count' => $totalCount,
             'next' => $nextUrl,
-            'next_url' => $nextUrl,
             'previous' => $prevUrl,
-            'previous_url' => $prevUrl,
             'results' => $formatted
         ]);
     }
