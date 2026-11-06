@@ -673,6 +673,55 @@ class PassageController extends Controller
     }
 
     /**
+     * Delete a single passage.
+     * Matches Python Django implementation: PassageViewSet.destroy
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
+     */
+    public function destroy(Request $request, $id)
+    {
+        $sanitizedId = $this->sanitizeUuid($id);
+
+        if (!$sanitizedId) {
+            return response()->json([
+                'detail' => 'Not found.'
+            ], 404);
+        }
+
+        $passage = Passage::find($sanitizedId);
+
+        if (!$passage) {
+            return response()->json([
+                'detail' => 'Not found.'
+            ], 404);
+        }
+
+        DB::transaction(function () use ($passage) {
+            // Find all assessments associated with this passage
+            $assessmentIds = DB::table('assessment_assessment')
+                ->where('passage_id', $passage->id)
+                ->pluck('id');
+
+            if ($assessmentIds->isNotEmpty()) {
+                // Delete cascading dependent tables for these assessments
+                DB::table('assessment_errorwords')->whereIn('assessment_id', $assessmentIds)->delete();
+                DB::table('assessment_assessment_checklists')->whereIn('assessment_id', $assessmentIds)->delete();
+                DB::table('assessment_assessmentstudentgrouphistory')->whereIn('assessment_id', $assessmentIds)->delete();
+
+                // Delete assessments
+                DB::table('assessment_assessment')->whereIn('id', $assessmentIds)->delete();
+            }
+
+            // Delete passage
+            $passage->delete();
+        });
+
+        return response()->noContent(204);
+    }
+
+    /**
      * Format a single passage matching Django's PassageSerializer.
      *
      * @param  \App\Models\Passage  $passage

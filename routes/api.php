@@ -151,6 +151,7 @@ Route::middleware(['django.auth'])->group(function () {
         // Passage Management
         Route::post('/passages', [PassageController::class, 'store']);
         Route::match(['put', 'patch'], '/passages/{id}', [PassageController::class, 'update']);
+        Route::delete('/passages/{id}', [PassageController::class, 'destroy']);
         Route::put('/passages/{id}/status', [PassageController::class, 'updateStatus']);
     });
 
