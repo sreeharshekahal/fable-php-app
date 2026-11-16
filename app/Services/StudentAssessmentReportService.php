@@ -438,16 +438,15 @@ class StudentAssessmentReportService
             'EOY' => $this->resolveCriteriaForPeriod('EOY', $assessments, $checklists, $studentId),
         ];
 
-        // Determine active period and primary criteria
+        // Determine active period metadata
         $normalizedRequested = $requestedPeriod ? $this->normalizePeriod($requestedPeriod) : null;
         if ($normalizedRequested && $normalizedRequested !== 'ALL' && isset($periods[$normalizedRequested])) {
             $activePeriodData = $periods[$normalizedRequested];
             $activePeriod = $normalizedRequested;
-            $criteria = $activePeriodData['criteria'];
             $evaluatedCount = $activePeriodData['assessments_evaluated_count'];
             $assessmentId = $activePeriodData['assessment_ids'][0] ?? null;
         } else {
-            // ALL / Full Year: resolve overall last up to 5 assessments merged
+            // ALL / Full Year: resolve overall last up to 5 assessments
             $recentAssessments = $assessments->sortByDesc('created')->values()->take(5);
             if ($recentAssessments->isEmpty()) {
                 $dbAssessments = DB::table('assessment_assessment')
@@ -463,27 +462,6 @@ class StudentAssessmentReportService
             $activePeriod = 'Full Year';
             $assessmentId = $latestAssessment ? $latestAssessment->id : null;
             $evaluatedCount = count($assessmentIds);
-
-            $selectedChecklistIds = [];
-            if (!empty($assessmentIds)) {
-                $selectedChecklistIds = DB::table('assessment_assessment_checklists')
-                    ->whereIn('assessment_id', $assessmentIds)
-                    ->pluck('checklist_id')
-                    ->unique()
-                    ->toArray();
-            }
-
-            $criteria = $checklists->map(function ($c) use ($selectedChecklistIds, $activePeriod) {
-                $isMet = in_array($c->id, $selectedChecklistIds, true);
-                return [
-                    'id' => $c->id,
-                    'title' => $c->title,
-                    'type' => (int)$c->type, // 0 = Fluency, 1 = Retell
-                    'type_label' => (int)$c->type === 0 ? 'Fluency' : 'Retell',
-                    'status' => $isMet ? 'Yes' : 'No',
-                    'assessment_period' => $activePeriod,
-                ];
-            })->values()->all();
         }
 
         return [
@@ -493,7 +471,6 @@ class StudentAssessmentReportService
             'assessment_id' => $assessmentId,
             'assessment_period' => $activePeriod,
             'assessments_evaluated_count' => $evaluatedCount,
-            'criteria' => $criteria,
             'periods' => $periods,
         ];
     }
