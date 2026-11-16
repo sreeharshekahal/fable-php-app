@@ -49,6 +49,24 @@ class AssessmentChecklistPeriodTest extends TestCase
         $this->assertSame('No', $report['periods']['EOY']['criteria'][0]['status']);
     }
 
+    public function test_passage_names_do_not_override_or_supply_periods(): void
+    {
+        $assessments = collect([
+            (object) ['id' => 'explicit', 'created' => '2025-07-01', 'assessment_period' => 'BOY', 'passage_name' => 'Story (EOY)'],
+            (object) ['id' => 'missing', 'created' => '2025-07-02', 'assessment_period' => null, 'passage_name' => 'Story (EOY)'],
+            (object) ['id' => 'numeric', 'created' => '2025-07-03', 'assessment_period' => '202602', 'passage_name' => 'Story (EOY)'],
+        ]);
+        $service = new StudentAssessmentReportService();
+        $report = $service->resolveRetellAndFluencyQuality('student', 'english', $assessments, 'EOY');
+        $this->assertSame(0, $report['assessments_evaluated_count']);
+        $report = $service->resolveRetellAndFluencyQuality('student', 'english', $assessments, 'BOY');
+        $this->assertSame(['explicit'], $report['periods']['BOY']['assessment_ids']);
+        $this->assertNull($service->normalizePeriod(null));
+        $this->assertNull($service->normalizePeriod('202602'));
+        $this->assertNull($service->normalizePeriod('invalid'));
+        $this->assertSame('EOY', $service->normalizePeriod(' eoy '));
+    }
+
     public function test_full_year_counts_every_scoped_assessment(): void
     {
         $assessments = collect(range(1, 8))->map(function ($i) {

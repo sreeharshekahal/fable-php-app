@@ -175,7 +175,7 @@ class StudentAssessmentReportService
         $filteredAssessments = $academicYearAssessments;
         if ($effectivePeriod !== 'ALL') {
             $filteredAssessments = $academicYearAssessments->filter(function ($item) use ($effectivePeriod) {
-                return $this->normalizePeriod($item->assessment_period, $item->passage_name ?? null) === $effectivePeriod;
+                return $this->normalizePeriod($item->assessment_period ?? null) === $effectivePeriod;
             })->values();
         }
 
@@ -307,7 +307,7 @@ class StudentAssessmentReportService
 
         // Find all BOY assessments, sorted chronologically
         $boyAssessments = $assessments->filter(function ($a) {
-            $p = $this->normalizePeriod($a->assessment_period, $a->passage_name ?? null);
+            $p = $this->normalizePeriod($a->assessment_period ?? null);
             return $p === 'BOY';
         })->sortBy('created')->values();
 
@@ -345,7 +345,7 @@ class StudentAssessmentReportService
                 return false;
             }
             // If another BOY exists in a strictly later calendar year, stop before that
-            $period = $this->normalizePeriod($a->assessment_period, $a->passage_name ?? null);
+            $period = $this->normalizePeriod($a->assessment_period ?? null);
             if ($created->year > $latestBoyYear && $period === 'BOY') {
                 return false;
             }
@@ -484,7 +484,7 @@ class StudentAssessmentReportService
     ): array {
         // Filter the already scoped collection; never pull in another language or cycle.
         $periodAssessments = $allAssessments->filter(function ($a) use ($period) {
-            return $this->normalizePeriod($a->assessment_period ?? null, $a->passage_name ?? null) === $period;
+            return $this->normalizePeriod($a->assessment_period ?? null) === $period;
         })->sortByDesc('created')->values();
 
         $assessmentIds = $periodAssessments->pluck('id')->filter()->toArray();
@@ -803,8 +803,8 @@ class StudentAssessmentReportService
         // Passage Title
         $passageTitle = $item->passage_name ?: 'Passage';
 
-        // Period label (derived from assessment_period or passage title e.g. "(MOY)", "(EOY)")
-        $period = $this->normalizePeriod($item->assessment_period, $passageTitle) ?: 'BOY';
+        // Use only the stored period; missing or invalid periods remain null.
+        $period = $this->normalizePeriod($item->assessment_period ?? null);
 
         // Benchmark goal resolution
         $goal = 0;
@@ -816,8 +816,7 @@ class StudentAssessmentReportService
                 $item->passage_language_id ?: $languageId,
                 $item->grade_id ?: $student->grade_id,
                 $item->assessment_group_level_id,
-                $item->assessment_period,
-                $passageTitle
+                $item->assessment_period ?? null
             );
         }
 
@@ -868,47 +867,13 @@ class StudentAssessmentReportService
     }
 
     /**
-     * Normalize period string to canonical format (BOY, MOY, EOY, ALL).
-     * Only BOY, MOY, and EOY are supported.
-     * Optionally takes a passage name to extract period from hints like "(BOY)", "(MOY)", "(EOY)".
+     * Normalize explicit period values without inferring a period from other fields.
      */
-    public function normalizePeriod(?string $period, ?string $passageName = null): ?string
+    public function normalizePeriod(?string $period): ?string
     {
-        // 1. If passage name contains explicit period tags like (BOY), (MOY), (EOY), prioritize it
-        if ($passageName) {
-            if (preg_match('/[\(\[\s_-](BOY|MOY|EOY)[\)\]\s_-]/i', $passageName, $m) ||
-                preg_match('/[\(\[](BOY|MOY|EOY)[\)\]]/i', $passageName, $m) ||
-                preg_match('/\b(BOY|MOY|EOY)\b/i', $passageName, $m)) {
-                return strtoupper($m[1]);
-            }
-        }
+        $period = strtoupper(trim($period ?? ''));
 
-        if (!$period) {
-            return null;
-        }
-        $p = strtoupper(trim((string)$period));
-
-        // Direct standard periods: only BOY, MOY, EOY, and ALL are supported
-        if (in_array($p, ['BOY', 'MOY', 'EOY', 'ALL'], true)) {
-            return $p;
-        }
-
-        // Handle numeric date format like YYYYMM (e.g., 202606)
-        if (preg_match('/^\d{4}(\d{2})$/', $p, $matches)) {
-            $month = (int)$matches[1];
-            // Jun-Oct: Beginning of Year (BOY)
-            // Nov-Jan: Middle of Year (MOY)
-            // Feb-May: End of Year (EOY)
-            if ($month >= 6 && $month <= 10) {
-                return 'BOY';
-            } elseif ($month >= 11 || $month === 1) {
-                return 'MOY';
-            } elseif ($month >= 2 && $month <= 5) {
-                return 'EOY';
-            }
-        }
-
-        return null;
+        return in_array($period, ['BOY', 'MOY', 'EOY', 'ALL'], true) ? $period : null;
     }
 
     /**
@@ -919,16 +884,19 @@ class StudentAssessmentReportService
         ?string $languageId,
         ?string $gradeId,
         ?string $levelId,
-        ?string $assessmentPeriod,
-        ?string $passageName = null
+        ?string $assessmentPeriod
     ): int {
         if (!$languageId || !$gradeId) {
             return 0;
         }
 
+        $resolvedPeriod = $this->normalizePeriod($assessmentPeriod);
+        if (!in_array($resolvedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
+            return 0;
+        }
+
         $template = BenchmarkTemplate::findForOrganisationLanguage($organisationId, $languageId);
         $templateId = $template ? $template->id : null;
-        $resolvedPeriod = $this->normalizePeriod($assessmentPeriod, $passageName) ?: ($template?->activeAssessmentPeriodForLanguage($languageId));
 
         $query = GroupingParameter::where('language_id', $languageId)
             ->where('grade_id', $gradeId);
@@ -953,20 +921,6 @@ class StudentAssessmentReportService
             if ($g && $g->goal !== null) return (int)$g->goal;
         }
 
-        // 3. Template + Null period
-        if ($templateId) {
-            $g = (clone $query)->where('benchmark_template_id', $templateId)
-                ->whereNull('assessment_period')
-                ->first();
-            if ($g && $g->goal !== null) return (int)$g->goal;
-        }
-
-        // 4. Fallback Default
-        $g = (clone $query)->whereNull('benchmark_template_id')
-            ->whereNull('assessment_period')
-            ->first();
-
-        return (int)($g?->goal ?? 0);
+        return 0;
     }
 }
-
