@@ -809,7 +809,8 @@ class AssessmentController extends Controller
         $assessmentId = $request->input('assessment');
         $studentId = $request->input('student_id', $request->input('student'));
         $assessmentPeriod = $request->input('assessment_period', $request->input('period'));
-        $normalizedPeriod = $assessmentPeriod ? strtoupper(trim($assessmentPeriod)) : null;
+        $reportService = app(\App\Services\StudentAssessmentReportService::class);
+        $normalizedPeriod = $assessmentPeriod ? $reportService->normalizePeriod($assessmentPeriod) : null;
 
         $selectedMap = [];
         if ($assessmentId) {
@@ -823,7 +824,16 @@ class AssessmentController extends Controller
                 ->where('student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
-                $assessmentQuery->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$normalizedPeriod]);
+                $assessmentQuery->where(function ($q) use ($normalizedPeriod) {
+                    $q->where(DB::raw('UPPER(TRIM(assessment_period))'), $normalizedPeriod);
+                    if ($normalizedPeriod === 'BOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
+                    } elseif ($normalizedPeriod === 'MOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(11|12|01)$'");
+                    } elseif ($normalizedPeriod === 'EOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
+                    }
+                });
             }
 
             $recentAssessmentIds = $assessmentQuery
@@ -887,7 +897,8 @@ class AssessmentController extends Controller
         $assessmentId = $request->input('assessment');
         $studentId = $request->input('student_id', $request->input('student'));
         $assessmentPeriod = $request->input('assessment_period', $request->input('period'));
-        $normalizedPeriod = $assessmentPeriod ? strtoupper(trim($assessmentPeriod)) : null;
+        $reportService = app(\App\Services\StudentAssessmentReportService::class);
+        $normalizedPeriod = $assessmentPeriod ? $reportService->normalizePeriod($assessmentPeriod) : null;
 
         $isSelected = false;
         if ($assessmentId) {
@@ -900,7 +911,16 @@ class AssessmentController extends Controller
                 ->where('student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
-                $query->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$normalizedPeriod]);
+                $query->where(function ($q) use ($normalizedPeriod) {
+                    $q->where(DB::raw('UPPER(TRIM(assessment_period))'), $normalizedPeriod);
+                    if ($normalizedPeriod === 'BOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
+                    } elseif ($normalizedPeriod === 'MOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(11|12|01)$'");
+                    } elseif ($normalizedPeriod === 'EOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
+                    }
+                });
             }
 
             $recentAssessmentIds = $query

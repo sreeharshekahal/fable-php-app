@@ -488,8 +488,8 @@ class StudentAssessmentReportService
         }
 
         return [
-            'subtitle' => $evaluatedCount > 0 
-                ? "Checklist based on last {$evaluatedCount} assessment(s)" 
+            'subtitle' => $evaluatedCount > 0
+                ? "Checklist based on last {$evaluatedCount} assessment(s)"
                 : 'Checklist based on last assessment',
             'assessment_id' => $assessmentId,
             'assessment_period' => $activePeriod,
@@ -518,7 +518,16 @@ class StudentAssessmentReportService
         if ($periodAssessments->isEmpty()) {
             $dbAssessments = DB::table('assessment_assessment')
                 ->where('student_id', $studentId)
-                ->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$period])
+                ->where(function ($q) use ($period) {
+                    $q->where(DB::raw('UPPER(TRIM(assessment_period))'), $period);
+                    if ($period === 'BOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
+                    } elseif ($period === 'MOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(11|12|01)$'");
+                    } elseif ($period === 'EOY') {
+                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
+                    }
+                })
                 ->orderBy('created', 'desc')
                 ->limit(5)
                 ->get();
@@ -913,10 +922,28 @@ class StudentAssessmentReportService
         if (!$period) {
             return null;
         }
-        $p = strtoupper(trim($period));
+        $p = strtoupper(trim((string)$period));
+
+        // Direct standard periods: only BOY, MOY, EOY, and ALL are supported
         if (in_array($p, ['BOY', 'MOY', 'EOY', 'ALL'], true)) {
             return $p;
         }
+
+        // Handle numeric date format like YYYYMM (e.g., 202606)
+        if (preg_match('/^\d{4}(\d{2})$/', $p, $matches)) {
+            $month = (int)$matches[1];
+            // Jun-Oct: Beginning of Year (BOY)
+            // Nov-Jan: Middle of Year (MOY)
+            // Feb-May: End of Year (EOY)
+            if ($month >= 6 && $month <= 10) {
+                return 'BOY';
+            } elseif ($month >= 11 || $month === 1) {
+                return 'MOY';
+            } elseif ($month >= 2 && $month <= 5) {
+                return 'EOY';
+            }
+        }
+
         return null;
     }
 
