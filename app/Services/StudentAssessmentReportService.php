@@ -226,7 +226,7 @@ class StudentAssessmentReportService
         // 9. Retell and Fluency Quality (Checklist)
         $retellFluencyQuality = null;
         if ($includeRetellFluency) {
-            $checklistAssessments = ($effectivePeriod !== 'ALL' && $filteredAssessments->isNotEmpty())
+            $checklistAssessments = ($effectivePeriod !== 'ALL')
                 ? $filteredAssessments
                 : $academicYearAssessments;
 
@@ -416,7 +416,7 @@ class StudentAssessmentReportService
 
     /**
      * Resolve Retell & Fluency Quality Checklist criteria and status (Yes/No),
-     * separated by assessment period (BOY, MOY, EOY) using the last 5 assessments merging approach.
+     * separated by assessment period (BOY, MOY, EOY), merging all matching assessments.
      */
     public function resolveRetellAndFluencyQuality(
         string $studentId,
@@ -451,16 +451,8 @@ class StudentAssessmentReportService
                 'EOY' => $this->resolveCriteriaForPeriod('EOY', $assessments, $checklists, $studentId),
             ];
 
-            // ALL / Full Year: resolve overall last up to 5 assessments
-            $recentAssessments = $assessments->sortByDesc('created')->values()->take(5);
-            if ($recentAssessments->isEmpty()) {
-                $dbAssessments = DB::table('assessment_assessment')
-                    ->where('student_id', $studentId)
-                    ->orderBy('created', 'desc')
-                    ->limit(5)
-                    ->get();
-                $recentAssessments = collect($dbAssessments);
-            }
+            // Use only assessments already scoped to the report language and academic cycle.
+            $recentAssessments = $assessments->sortByDesc('created')->values();
 
             $assessmentIds = $recentAssessments->pluck('id')->filter()->toArray();
             $latestAssessment = $recentAssessments->first();
@@ -471,8 +463,8 @@ class StudentAssessmentReportService
 
         return [
             'subtitle' => $evaluatedCount > 0
-                ? "Checklist based on last {$evaluatedCount} assessment(s)"
-                : 'Checklist based on last assessment',
+                ? "Checklist based on all {$evaluatedCount} assessment(s)"
+                : 'No assessments available for this period',
             'assessment_id' => $assessmentId,
             'assessment_period' => $activePeriod,
             'assessments_evaluated_count' => $evaluatedCount,
@@ -482,7 +474,7 @@ class StudentAssessmentReportService
 
     /**
      * Helper to resolve criteria for a specific assessment period (BOY, MOY, EOY)
-     * using the merging approach across the last 5 assessments.
+     * using all matching assessments from the report academic cycle.
      */
     protected function resolveCriteriaForPeriod(
         string $period,
@@ -490,33 +482,10 @@ class StudentAssessmentReportService
         Collection $checklists,
         string $studentId
     ): array {
-        // Find assessments for this period from the collection, newest first, max 5
+        // Filter the already scoped collection; never pull in another language or cycle.
         $periodAssessments = $allAssessments->filter(function ($a) use ($period) {
             return $this->normalizePeriod($a->assessment_period ?? null, $a->passage_name ?? null) === $period;
-        })->sortByDesc('created')->values()->take(5);
-
-        // Fallback to database if none found in collection
-        if ($periodAssessments->isEmpty()) {
-            $dbAssessments = DB::table('assessment_assessment as a')
-                ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
-                ->where('a.student_id', $studentId)
-                ->where(function ($q) use ($period) {
-                    $q->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $period)
-                      ->orWhereRaw("p.passage_name ~* ?", ["[\(\[\s_-]" . $period . "[\)\]\s_-]|[\(\[]" . $period . "[\)\]]|\b" . $period . "\b"]);
-                    if ($period === 'BOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
-                    } elseif ($period === 'MOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(11|12|01)$'");
-                    } elseif ($period === 'EOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
-                    }
-                })
-                ->select('a.*', 'p.passage_name')
-                ->orderBy('a.created', 'desc')
-                ->limit(5)
-                ->get();
-            $periodAssessments = collect($dbAssessments);
-        }
+        })->sortByDesc('created')->values();
 
         $assessmentIds = $periodAssessments->pluck('id')->filter()->toArray();
         $selectedChecklistIds = [];
