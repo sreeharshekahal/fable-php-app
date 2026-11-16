@@ -26,10 +26,6 @@ class TeacherController extends Controller
      */
     public function destroy(Request $request, string $id)
     {
-        if (!DB::table('access_admin')->where('user_id', $request->user()->id)->exists()) {
-            return response()->json(['message' => 'User is not authorized to delete a teacher'], 403);
-        }
-
         if (!Str::isUuid($id)) {
             return response()->json(['message' => 'Invalid teacher ID'], 400);
         }

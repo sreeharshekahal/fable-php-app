@@ -102,7 +102,6 @@ Route::middleware(['token.auth'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['django.auth'])->group(function () {
-    Route::delete('/teachers/{id}', [TeacherController::class, 'destroy']);
     // Current authenticated user aliases
     Route::get('/user', [AuthSessionController::class, 'user']);
     Route::get('/me', [UserController::class, 'me']);
@@ -111,6 +110,8 @@ Route::middleware(['django.auth'])->group(function () {
 
     // Admin-only Routes
     Route::middleware(['admin.permission'])->group(function () {
+        Route::delete('/teachers/{id}', [TeacherController::class, 'destroy']);
+        
         // Analytics
         Route::get('/group-wise-distribution-per-grade', [OrganisationAnalyticsController::class, 'groupWiseDistributionPerGrade']);
         Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
