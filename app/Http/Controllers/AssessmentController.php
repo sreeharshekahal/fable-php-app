@@ -825,17 +825,7 @@ class AssessmentController extends Controller
                 ->where('a.student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
-                $assessmentQuery->where(function ($q) use ($normalizedPeriod) {
-                    $q->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod)
-                      ->orWhereRaw("p.passage_name ~* ?", ["[\(\[\s_-]" . $normalizedPeriod . "[\)\]\s_-]|[\(\[]" . $normalizedPeriod . "[\)\]]|\b" . $normalizedPeriod . "\b"]);
-                    if ($normalizedPeriod === 'BOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
-                    } elseif ($normalizedPeriod === 'MOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(11|12|01)$'");
-                    } elseif ($normalizedPeriod === 'EOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
-                    }
-                });
+                $assessmentQuery->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod);
             }
 
             $recentAssessmentIds = $assessmentQuery
@@ -914,17 +904,7 @@ class AssessmentController extends Controller
                 ->where('a.student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
-                $query->where(function ($q) use ($normalizedPeriod) {
-                    $q->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod)
-                      ->orWhereRaw("p.passage_name ~* ?", ["[\(\[\s_-]" . $normalizedPeriod . "[\)\]\s_-]|[\(\[]" . $normalizedPeriod . "[\)\]]|\b" . $normalizedPeriod . "\b"]);
-                    if ($normalizedPeriod === 'BOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
-                    } elseif ($normalizedPeriod === 'MOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(11|12|01)$'");
-                    } elseif ($normalizedPeriod === 'EOY') {
-                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
-                    }
-                });
+                $query->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod);
             }
 
             $recentAssessmentIds = $query
