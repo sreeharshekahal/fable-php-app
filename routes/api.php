@@ -102,6 +102,7 @@ Route::middleware(['token.auth'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['django.auth'])->group(function () {
+    Route::delete('/teachers/{id}', [TeacherController::class, 'destroy']);
     // Current authenticated user aliases
     Route::get('/user', [AuthSessionController::class, 'user']);
     Route::get('/me', [UserController::class, 'me']);

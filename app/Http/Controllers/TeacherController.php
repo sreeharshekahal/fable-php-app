@@ -15,6 +15,51 @@ use App\Models\BenchmarkTemplate;
 class TeacherController extends Controller
 {
     /**
+     * Delete a teacher record.
+     *
+     * Validates that the requesting user is an authorized admin, checks that the teacher exists
+     * and has no associated assessments, detaches related groups and languages, and deletes the teacher.
+     *
+     * @param Request $request
+     * @param string $id
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\Response
+     */
+    public function destroy(Request $request, string $id)
+    {
+        if (!DB::table('access_admin')->where('user_id', $request->user()->id)->exists()) {
+            return response()->json(['message' => 'User is not authorized to delete a teacher'], 403);
+        }
+
+        if (!Str::isUuid($id)) {
+            return response()->json(['message' => 'Invalid teacher ID'], 400);
+        }
+
+        try {
+            return DB::transaction(function () use ($id) {
+                $teacher = Teacher::whereKey($id)->lockForUpdate()->first();
+                if (!$teacher) {
+                    return response()->json(['message' => 'Teacher not found'], 404);
+                }
+                if (DB::table('assessment_assessment')->where('conducted_by_id', $id)->exists()) {
+                    return response()->json(['message' => 'Cannot delete a teacher with assessments'], 409);
+                }
+
+                $teacher->groups()->detach();
+                $teacher->languages()->detach();
+                $teacher->delete();
+
+                // The account may also have another role.
+                return response()->noContent();
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (in_array((string) $e->getCode(), ['23503', '23000'], true)) {
+                return response()->json(['message' => 'Cannot delete a teacher referenced by other records'], 409);
+            }
+            throw $e;
+        }
+    }
+
+    /**
      * Get a list of teachers with pagination, filtering, and search.
      * Matches Python structure /api/teachers/
      */
