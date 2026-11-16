@@ -460,8 +460,7 @@ class StudentAssessmentReportService
 
             $assessmentIds = $recentAssessments->pluck('id')->filter()->toArray();
             $latestAssessment = $recentAssessments->first();
-            $latestPeriod = $latestAssessment ? $this->normalizePeriod($latestAssessment->assessment_period ?? null, $latestAssessment->passage_name ?? null) : null;
-            $activePeriod = $latestPeriod ?: 'ALL';
+            $activePeriod = 'Full Year';
             $assessmentId = $latestAssessment ? $latestAssessment->id : null;
             $evaluatedCount = count($assessmentIds);
 
