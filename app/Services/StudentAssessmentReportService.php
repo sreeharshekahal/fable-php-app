@@ -431,21 +431,26 @@ class StudentAssessmentReportService
         }
         $checklists = $checklistsQuery->orderBy('type', 'asc')->orderBy('title', 'asc')->get();
 
-        // Calculate period-specific criteria for BOY, MOY, EOY (merging up to last 5 assessments per period)
-        $periods = [
-            'BOY' => $this->resolveCriteriaForPeriod('BOY', $assessments, $checklists, $studentId),
-            'MOY' => $this->resolveCriteriaForPeriod('MOY', $assessments, $checklists, $studentId),
-            'EOY' => $this->resolveCriteriaForPeriod('EOY', $assessments, $checklists, $studentId),
-        ];
-
         // Determine active period metadata
         $normalizedRequested = $requestedPeriod ? $this->normalizePeriod($requestedPeriod) : null;
-        if ($normalizedRequested && $normalizedRequested !== 'ALL' && isset($periods[$normalizedRequested])) {
-            $activePeriodData = $periods[$normalizedRequested];
+
+        // If filtered by an assessment period (e.g. MOY), calculate and return only that period in `periods`
+        if ($normalizedRequested && in_array($normalizedRequested, ['BOY', 'MOY', 'EOY'], true)) {
+            $periodData = $this->resolveCriteriaForPeriod($normalizedRequested, $assessments, $checklists, $studentId);
+            $periods = [
+                $normalizedRequested => $periodData,
+            ];
             $activePeriod = $normalizedRequested;
-            $evaluatedCount = $activePeriodData['assessments_evaluated_count'];
-            $assessmentId = $activePeriodData['assessment_ids'][0] ?? null;
+            $evaluatedCount = $periodData['assessments_evaluated_count'];
+            $assessmentId = $periodData['assessment_ids'][0] ?? null;
         } else {
+            // Full Year / ALL: calculate period-specific criteria for BOY, MOY, EOY
+            $periods = [
+                'BOY' => $this->resolveCriteriaForPeriod('BOY', $assessments, $checklists, $studentId),
+                'MOY' => $this->resolveCriteriaForPeriod('MOY', $assessments, $checklists, $studentId),
+                'EOY' => $this->resolveCriteriaForPeriod('EOY', $assessments, $checklists, $studentId),
+            ];
+
             // ALL / Full Year: resolve overall last up to 5 assessments
             $recentAssessments = $assessments->sortByDesc('created')->values()->take(5);
             if ($recentAssessments->isEmpty()) {
