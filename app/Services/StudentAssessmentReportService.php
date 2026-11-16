@@ -175,7 +175,7 @@ class StudentAssessmentReportService
         $filteredAssessments = $academicYearAssessments;
         if ($effectivePeriod !== 'ALL') {
             $filteredAssessments = $academicYearAssessments->filter(function ($item) use ($effectivePeriod) {
-                return $this->normalizePeriod($item->assessment_period) === $effectivePeriod;
+                return $this->normalizePeriod($item->assessment_period, $item->passage_name ?? null) === $effectivePeriod;
             })->values();
         }
 
@@ -307,7 +307,7 @@ class StudentAssessmentReportService
 
         // Find all BOY assessments, sorted chronologically
         $boyAssessments = $assessments->filter(function ($a) {
-            $p = $this->normalizePeriod($a->assessment_period);
+            $p = $this->normalizePeriod($a->assessment_period, $a->passage_name ?? null);
             return $p === 'BOY';
         })->sortBy('created')->values();
 
@@ -345,7 +345,7 @@ class StudentAssessmentReportService
                 return false;
             }
             // If another BOY exists in a strictly later calendar year, stop before that
-            $period = $this->normalizePeriod($a->assessment_period);
+            $period = $this->normalizePeriod($a->assessment_period, $a->passage_name ?? null);
             if ($created->year > $latestBoyYear && $period === 'BOY') {
                 return false;
             }
@@ -460,7 +460,7 @@ class StudentAssessmentReportService
 
             $assessmentIds = $recentAssessments->pluck('id')->filter()->toArray();
             $latestAssessment = $recentAssessments->first();
-            $latestPeriod = $latestAssessment ? $this->normalizePeriod($latestAssessment->assessment_period ?? null) : null;
+            $latestPeriod = $latestAssessment ? $this->normalizePeriod($latestAssessment->assessment_period ?? null, $latestAssessment->passage_name ?? null) : null;
             $activePeriod = $latestPeriod ?: 'ALL';
             $assessmentId = $latestAssessment ? $latestAssessment->id : null;
             $evaluatedCount = count($assessmentIds);
@@ -511,24 +511,27 @@ class StudentAssessmentReportService
     ): array {
         // Find assessments for this period from the collection, newest first, max 5
         $periodAssessments = $allAssessments->filter(function ($a) use ($period) {
-            return $this->normalizePeriod($a->assessment_period ?? null) === $period;
+            return $this->normalizePeriod($a->assessment_period ?? null, $a->passage_name ?? null) === $period;
         })->sortByDesc('created')->values()->take(5);
 
         // Fallback to database if none found in collection
         if ($periodAssessments->isEmpty()) {
-            $dbAssessments = DB::table('assessment_assessment')
-                ->where('student_id', $studentId)
+            $dbAssessments = DB::table('assessment_assessment as a')
+                ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
+                ->where('a.student_id', $studentId)
                 ->where(function ($q) use ($period) {
-                    $q->where(DB::raw('UPPER(TRIM(assessment_period))'), $period);
+                    $q->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $period)
+                      ->orWhereRaw("p.passage_name ~* ?", ["[\(\[\s_-]" . $period . "[\)\]\s_-]|[\(\[]" . $period . "[\)\]]|\b" . $period . "\b"]);
                     if ($period === 'BOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
                     } elseif ($period === 'MOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(11|12|01)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(11|12|01)$'");
                     } elseif ($period === 'EOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
                     }
                 })
-                ->orderBy('created', 'desc')
+                ->select('a.*', 'p.passage_name')
+                ->orderBy('a.created', 'desc')
                 ->limit(5)
                 ->get();
             $periodAssessments = collect($dbAssessments);
@@ -847,6 +850,12 @@ class StudentAssessmentReportService
         $errors = (int)$item->no_error_words;
         $score = max(0, $totalWords - $errors);
 
+        // Passage Title
+        $passageTitle = $item->passage_name ?: 'Passage';
+
+        // Period label (derived from assessment_period or passage title e.g. "(MOY)", "(EOY)")
+        $period = $this->normalizePeriod($item->assessment_period, $passageTitle) ?: 'BOY';
+
         // Benchmark goal resolution
         $goal = 0;
         if (!empty($item->benchmark_goal) && (int)$item->benchmark_goal > 0) {
@@ -857,7 +866,8 @@ class StudentAssessmentReportService
                 $item->passage_language_id ?: $languageId,
                 $item->grade_id ?: $student->grade_id,
                 $item->assessment_group_level_id,
-                $item->assessment_period
+                $item->assessment_period,
+                $passageTitle
             );
         }
 
@@ -866,12 +876,6 @@ class StudentAssessmentReportService
         if ($feedback === '') {
             $feedback = 'None';
         }
-
-        // Period label
-        $period = $this->normalizePeriod($item->assessment_period) ?: 'BOY';
-
-        // Passage Title
-        $passageTitle = $item->passage_name ?: 'Passage';
 
         // Audio resolution
         $audioDownloadUrl = null;
@@ -916,9 +920,19 @@ class StudentAssessmentReportService
     /**
      * Normalize period string to canonical format (BOY, MOY, EOY, ALL).
      * Only BOY, MOY, and EOY are supported.
+     * Optionally takes a passage name to extract period from hints like "(BOY)", "(MOY)", "(EOY)".
      */
-    public function normalizePeriod(?string $period): ?string
+    public function normalizePeriod(?string $period, ?string $passageName = null): ?string
     {
+        // 1. If passage name contains explicit period tags like (BOY), (MOY), (EOY), prioritize it
+        if ($passageName) {
+            if (preg_match('/[\(\[\s_-](BOY|MOY|EOY)[\)\]\s_-]/i', $passageName, $m) ||
+                preg_match('/[\(\[](BOY|MOY|EOY)[\)\]]/i', $passageName, $m) ||
+                preg_match('/\b(BOY|MOY|EOY)\b/i', $passageName, $m)) {
+                return strtoupper($m[1]);
+            }
+        }
+
         if (!$period) {
             return null;
         }
@@ -955,7 +969,8 @@ class StudentAssessmentReportService
         ?string $languageId,
         ?string $gradeId,
         ?string $levelId,
-        ?string $assessmentPeriod
+        ?string $assessmentPeriod,
+        ?string $passageName = null
     ): int {
         if (!$languageId || !$gradeId) {
             return 0;
@@ -963,7 +978,7 @@ class StudentAssessmentReportService
 
         $template = BenchmarkTemplate::findForOrganisationLanguage($organisationId, $languageId);
         $templateId = $template ? $template->id : null;
-        $resolvedPeriod = $this->normalizePeriod($assessmentPeriod) ?: ($template?->activeAssessmentPeriodForLanguage($languageId));
+        $resolvedPeriod = $this->normalizePeriod($assessmentPeriod, $passageName) ?: ($template?->activeAssessmentPeriodForLanguage($languageId));
 
         $query = GroupingParameter::where('language_id', $languageId)
             ->where('grade_id', $gradeId);

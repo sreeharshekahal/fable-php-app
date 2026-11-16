@@ -820,26 +820,28 @@ class AssessmentController extends Controller
                 ->flip()
                 ->toArray();
         } elseif ($studentId) {
-            $assessmentQuery = DB::table('assessment_assessment')
-                ->where('student_id', $studentId);
+            $assessmentQuery = DB::table('assessment_assessment as a')
+                ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
+                ->where('a.student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
                 $assessmentQuery->where(function ($q) use ($normalizedPeriod) {
-                    $q->where(DB::raw('UPPER(TRIM(assessment_period))'), $normalizedPeriod);
+                    $q->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod)
+                      ->orWhereRaw("p.passage_name ~* ?", ["[\(\[\s_-]" . $normalizedPeriod . "[\)\]\s_-]|[\(\[]" . $normalizedPeriod . "[\)\]]|\b" . $normalizedPeriod . "\b"]);
                     if ($normalizedPeriod === 'BOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
                     } elseif ($normalizedPeriod === 'MOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(11|12|01)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(11|12|01)$'");
                     } elseif ($normalizedPeriod === 'EOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
                     }
                 });
             }
 
             $recentAssessmentIds = $assessmentQuery
-                ->orderBy('created', 'desc')
+                ->orderBy('a.created', 'desc')
                 ->limit(5)
-                ->pluck('id')
+                ->pluck('a.id')
                 ->toArray();
 
             if (!empty($recentAssessmentIds)) {
@@ -907,26 +909,28 @@ class AssessmentController extends Controller
                 ->where('checklist_id', $row->id)
                 ->exists();
         } elseif ($studentId) {
-            $query = DB::table('assessment_assessment')
-                ->where('student_id', $studentId);
+            $query = DB::table('assessment_assessment as a')
+                ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
+                ->where('a.student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
                 $query->where(function ($q) use ($normalizedPeriod) {
-                    $q->where(DB::raw('UPPER(TRIM(assessment_period))'), $normalizedPeriod);
+                    $q->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod)
+                      ->orWhereRaw("p.passage_name ~* ?", ["[\(\[\s_-]" . $normalizedPeriod . "[\)\]\s_-]|[\(\[]" . $normalizedPeriod . "[\)\]]|\b" . $normalizedPeriod . "\b"]);
                     if ($normalizedPeriod === 'BOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(06|07|08|09|10)$'");
                     } elseif ($normalizedPeriod === 'MOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(11|12|01)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(11|12|01)$'");
                     } elseif ($normalizedPeriod === 'EOY') {
-                        $q->orWhereRaw("assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
+                        $q->orWhereRaw("a.assessment_period ~ '^[0-9]{4}(02|03|04|05)$'");
                     }
                 });
             }
 
             $recentAssessmentIds = $query
-                ->orderBy('created', 'desc')
+                ->orderBy('a.created', 'desc')
                 ->limit(5)
-                ->pluck('id')
+                ->pluck('a.id')
                 ->toArray();
 
             if (!empty($recentAssessmentIds)) {
