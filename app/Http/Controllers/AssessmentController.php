@@ -807,6 +807,10 @@ class AssessmentController extends Controller
         $results = $query->offset($offset)->limit($limit)->get();
 
         $assessmentId = $request->input('assessment');
+        $studentId = $request->input('student_id', $request->input('student'));
+        $assessmentPeriod = $request->input('assessment_period', $request->input('period'));
+        $normalizedPeriod = $assessmentPeriod ? strtoupper(trim($assessmentPeriod)) : null;
+
         $selectedMap = [];
         if ($assessmentId) {
             $selectedMap = DB::table('assessment_assessment_checklists')
@@ -814,9 +818,30 @@ class AssessmentController extends Controller
                 ->pluck('checklist_id')
                 ->flip()
                 ->toArray();
+        } elseif ($studentId) {
+            $assessmentQuery = DB::table('assessment_assessment')
+                ->where('student_id', $studentId);
+
+            if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
+                $assessmentQuery->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$normalizedPeriod]);
+            }
+
+            $recentAssessmentIds = $assessmentQuery
+                ->orderBy('created', 'desc')
+                ->limit(5)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($recentAssessmentIds)) {
+                $selectedMap = DB::table('assessment_assessment_checklists')
+                    ->whereIn('assessment_id', $recentAssessmentIds)
+                    ->pluck('checklist_id')
+                    ->flip()
+                    ->toArray();
+            }
         }
 
-        $formatted = $results->map(function ($row) use ($selectedMap) {
+        $formatted = $results->map(function ($row) use ($selectedMap, $normalizedPeriod) {
             return [
                 'id' => $row->id,
                 'selected' => isset($selectedMap[$row->id]),
@@ -825,6 +850,7 @@ class AssessmentController extends Controller
                 'updated' => $this->formatDateTime($row->updated),
                 'title' => $row->title,
                 'type' => (int) $row->type,
+                'assessment_period' => $normalizedPeriod,
             ];
         });
 
@@ -859,12 +885,36 @@ class AssessmentController extends Controller
         }
 
         $assessmentId = $request->input('assessment');
+        $studentId = $request->input('student_id', $request->input('student'));
+        $assessmentPeriod = $request->input('assessment_period', $request->input('period'));
+        $normalizedPeriod = $assessmentPeriod ? strtoupper(trim($assessmentPeriod)) : null;
+
         $isSelected = false;
         if ($assessmentId) {
             $isSelected = DB::table('assessment_assessment_checklists')
                 ->where('assessment_id', $assessmentId)
                 ->where('checklist_id', $row->id)
                 ->exists();
+        } elseif ($studentId) {
+            $query = DB::table('assessment_assessment')
+                ->where('student_id', $studentId);
+
+            if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
+                $query->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$normalizedPeriod]);
+            }
+
+            $recentAssessmentIds = $query
+                ->orderBy('created', 'desc')
+                ->limit(5)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($recentAssessmentIds)) {
+                $isSelected = DB::table('assessment_assessment_checklists')
+                    ->whereIn('assessment_id', $recentAssessmentIds)
+                    ->where('checklist_id', $row->id)
+                    ->exists();
+            }
         }
 
         return response()->json([
@@ -875,6 +925,7 @@ class AssessmentController extends Controller
             'updated' => $this->formatDateTime($row->updated),
             'title' => $row->title,
             'type' => (int) $row->type,
+            'assessment_period' => $normalizedPeriod,
         ], 200, [], JSON_PRESERVE_ZERO_FRACTION);
     }
 
