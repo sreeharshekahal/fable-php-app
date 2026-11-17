@@ -87,6 +87,12 @@ Route::middleware(['token.auth'])->group(function () {
     Route::put('/updateTeacher/{id}', [User::class, 'updateTeacher']);
     Route::get('/getCounts', [Dashboard::class, 'getCounts']);
     Route::get('/getTeacher/{id}', [User::class, 'getTeacher']);
+
+    Route::post('/add-student', [User::class, 'addStudent']);
+    Route::post('/edit-student/{id}', [User::class, 'editStudent']);
+    Route::post('/add-teacher', [User::class, 'addTeacher']);
+    Route::post('/bulk-upload-student', [User::class, 'bulkUploadStudent']);
+    Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
 });
 
 /*
@@ -194,15 +200,20 @@ Route::middleware(['django.auth'])->group(function () {
     Route::get('/generate-excel', [AssessmentController::class, 'generateExcel']);
 
     // Auth integration
-    Route::post('/add-student', [User::class, 'addStudent']);
-    Route::post('/edit-student/{id}', [User::class, 'editStudent']);
-    Route::post('/add-teacher', [User::class, 'addTeacher']);
+    Route::middleware(['role:admin,teacher'])->group(function () {
+        Route::post('/add-student', [User::class, 'addStudent']);
+        Route::post('/edit-student/{id}', [User::class, 'editStudent']);
+        Route::post('/add-teacher', [User::class, 'addTeacher']);
 
-    Route::post('/bulk-upload-student', [User::class, 'bulkUploadStudent']);
-    Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
+        Route::post('/bulk-upload-student', [User::class, 'bulkUploadStudent']);
+        Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
+    });
 
-    Route::post('/saveAudio', [User::class, 'saveAudio']);
-    Route::post('/saveDeviceDetails/{id}', [User::class, 'saveDeviceDetails']);
+    Route::middleware(['role:admin,teacher'])->group(function () {
+        Route::post('/saveAudio', [User::class, 'saveAudio']);
+        Route::post('/saveDeviceDetails/{id}', [User::class, 'saveDeviceDetails']);
+    });
+
 });
 
 /*
