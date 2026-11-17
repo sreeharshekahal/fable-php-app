@@ -296,37 +296,36 @@ class User extends Controller
                 'student_id' => 'required'
             ]);
 
-            $base64Audio = $request->input('audio');
-            $filename = time() . '_audio';
-
-            $audioData = base64_decode($base64Audio);
-
-            if ($audioData === false) {
-                return response()->json(['error' => 'Invalid Base64 encoding'], 400);
+            $fileUrl = '';
+            if ($request->hasFile('audio')) {
+                $filename = time() . '_audio.mp3';
+                $filePath = "uploads/audio/{$filename}";
+                Storage::disk('s3')->put($filePath, file_get_contents($request->file('audio')->getRealPath()));
+                $fileUrl = Storage::disk('s3')->url($filePath);
+            } elseif ($request->filled('audio')) {
+                $filename = time() . '_audio.mp3';
+                $audioData = base64_decode($request->input('audio'));
+                if ($audioData !== false) {
+                    $filePath = "uploads/audio/{$filename}";
+                    Storage::disk('s3')->put($filePath, $audioData);
+                    $fileUrl = Storage::disk('s3')->url($filePath);
+                }
             }
 
-            $filePath = "uploads/audio/{$filename}.mp3";
-
-            Storage::disk('s3')->put($filePath, $audioData);
-
-            $fileUrl = Storage::disk('s3')->url($filePath);
             $retellfileUrl = '';
-
-            if ($request->input('retell_audio')) {
-                $base64Audio = $request->input('retell_audio');
-                $filename = time() . '_retell_audio';
-
-                $audioData = base64_decode($base64Audio);
-
-                if ($audioData === false) {
-                    return response()->json(['error' => 'Invalid Base64 encoding'], 400);
-                }
-
-                $filePath = "uploads/audio/{$filename}.mp3";
-
-                Storage::disk('s3')->put($filePath, $audioData);
-
+            if ($request->hasFile('retell_audio')) {
+                $filename = time() . '_retell_audio.mp3';
+                $filePath = "uploads/audio/{$filename}";
+                Storage::disk('s3')->put($filePath, file_get_contents($request->file('retell_audio')->getRealPath()));
                 $retellfileUrl = Storage::disk('s3')->url($filePath);
+            } elseif ($request->filled('retell_audio')) {
+                $filename = time() . '_retell_audio.mp3';
+                $audioData = base64_decode($request->input('retell_audio'));
+                if ($audioData !== false) {
+                    $filePath = "uploads/audio/{$filename}";
+                    Storage::disk('s3')->put($filePath, $audioData);
+                    $retellfileUrl = Storage::disk('s3')->url($filePath);
+                }
             }
 
             $model = new UserModel();
