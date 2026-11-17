@@ -40,6 +40,7 @@ use App\Http\Controllers\LanguageController;
 | Authentication & Password Reset (rest-auth)
 |--------------------------------------------------------------------------
 */
+
 Route::prefix('rest-auth')->group(function () {
     Route::post('/login', [AuthSessionController::class, 'login']);
     Route::post('/password/reset', [AuthPasswordController::class, 'passwordReset']);
@@ -76,14 +77,6 @@ Route::get('/allOrgUsersCount', [User::class, 'allOrgUsersCount']);
 Route::get('/organisationUsersCount/{id}', [User::class, 'organisationUsersCount']);
 Route::get('/organisations/{id}/groups', [OrganisationGroupController::class, 'getOrganisationGroups']);
 
-Route::post('/saveAudio', [User::class, 'saveAudio']);
-Route::post('/saveDeviceDetails/{id}', [User::class, 'saveDeviceDetails']);
-Route::post('/bulk-upload-student', [User::class, 'bulkUploadStudent']);
-Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
-Route::post('/add-student', [User::class, 'addStudent']);
-Route::post('/edit-student/{id}', [User::class, 'editStudent']);
-Route::post('/add-teacher', [User::class, 'addTeacher']);
-
 /*
 |--------------------------------------------------------------------------
 | Legacy Token Auth
@@ -111,7 +104,7 @@ Route::middleware(['django.auth'])->group(function () {
     // Admin-only Routes
     Route::middleware(['admin.permission'])->group(function () {
         Route::delete('/teachers/{id}', [TeacherController::class, 'destroy']);
-        
+
         // Analytics
         Route::get('/group-wise-distribution-per-grade', [OrganisationAnalyticsController::class, 'groupWiseDistributionPerGrade']);
         Route::get('/performance-per-grade', [AnalyticsController::class, 'performancePerGrade']);
@@ -199,6 +192,17 @@ Route::middleware(['django.auth'])->group(function () {
     Route::get('/assessments/export', [AssessmentController::class, 'generateExcel']);
     Route::get('/assessments/{id}', [AssessmentController::class, 'getAssessmentDetails']);
     Route::get('/generate-excel', [AssessmentController::class, 'generateExcel']);
+
+    // Auth integration
+    Route::post('/add-student', [User::class, 'addStudent']);
+    Route::post('/edit-student/{id}', [User::class, 'editStudent']);
+    Route::post('/add-teacher', [User::class, 'addTeacher']);
+
+    Route::post('/bulk-upload-student', [User::class, 'bulkUploadStudent']);
+    Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
+
+    Route::post('/saveAudio', [User::class, 'saveAudio']);
+    Route::post('/saveDeviceDetails/{id}', [User::class, 'saveDeviceDetails']);
 });
 
 /*
