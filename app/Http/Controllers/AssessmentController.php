@@ -23,6 +23,8 @@ use App\Models\Level;
 use App\Models\BenchmarkTemplate;
 use App\Services\WordCategorizationService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\AssessmentExport;
 
 class AssessmentController extends Controller
 {
@@ -809,8 +811,7 @@ class AssessmentController extends Controller
         $assessmentId = $request->input('assessment');
         $studentId = $request->input('student_id', $request->input('student'));
         $assessmentPeriod = $request->input('assessment_period', $request->input('period'));
-        $reportService = app(\App\Services\StudentAssessmentReportService::class);
-        $normalizedPeriod = $assessmentPeriod ? $reportService->normalizePeriod($assessmentPeriod) : null;
+        $normalizedPeriod = $assessmentPeriod ? strtoupper(trim($assessmentPeriod)) : null;
 
         $selectedMap = [];
         if ($assessmentId) {
@@ -820,18 +821,17 @@ class AssessmentController extends Controller
                 ->flip()
                 ->toArray();
         } elseif ($studentId) {
-            $assessmentQuery = DB::table('assessment_assessment as a')
-                ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
-                ->where('a.student_id', $studentId);
+            $assessmentQuery = DB::table('assessment_assessment')
+                ->where('student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
-                $assessmentQuery->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod);
+                $assessmentQuery->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$normalizedPeriod]);
             }
 
             $recentAssessmentIds = $assessmentQuery
-                ->orderBy('a.created', 'desc')
+                ->orderBy('created', 'desc')
                 ->limit(5)
-                ->pluck('a.id')
+                ->pluck('id')
                 ->toArray();
 
             if (!empty($recentAssessmentIds)) {
@@ -889,8 +889,7 @@ class AssessmentController extends Controller
         $assessmentId = $request->input('assessment');
         $studentId = $request->input('student_id', $request->input('student'));
         $assessmentPeriod = $request->input('assessment_period', $request->input('period'));
-        $reportService = app(\App\Services\StudentAssessmentReportService::class);
-        $normalizedPeriod = $assessmentPeriod ? $reportService->normalizePeriod($assessmentPeriod) : null;
+        $normalizedPeriod = $assessmentPeriod ? strtoupper(trim($assessmentPeriod)) : null;
 
         $isSelected = false;
         if ($assessmentId) {
@@ -899,18 +898,17 @@ class AssessmentController extends Controller
                 ->where('checklist_id', $row->id)
                 ->exists();
         } elseif ($studentId) {
-            $query = DB::table('assessment_assessment as a')
-                ->leftJoin('passage_passage as p', 'a.passage_id', '=', 'p.id')
-                ->where('a.student_id', $studentId);
+            $query = DB::table('assessment_assessment')
+                ->where('student_id', $studentId);
 
             if ($normalizedPeriod && in_array($normalizedPeriod, ['BOY', 'MOY', 'EOY'], true)) {
-                $query->where(DB::raw('UPPER(TRIM(a.assessment_period))'), $normalizedPeriod);
+                $query->whereRaw('UPPER(TRIM(assessment_period)) = ?', [$normalizedPeriod]);
             }
 
             $recentAssessmentIds = $query
-                ->orderBy('a.created', 'desc')
+                ->orderBy('created', 'desc')
                 ->limit(5)
-                ->pluck('a.id')
+                ->pluck('id')
                 ->toArray();
 
             if (!empty($recentAssessmentIds)) {
@@ -1148,6 +1146,12 @@ class AssessmentController extends Controller
         if ($request->filled('language')) {
             $query->where('l.name', $request->input('language'));
         }
+        if ($request->filled('division')) {
+            $query->where('s.division', $request->input('division'));
+        }
+        if ($request->filled('grade')) {
+            $query->where('a.grade_id', $request->input('grade'));
+        }
         if ($request->filled('organisation')) {
             $query->where('a.organisation_id', $request->input('organisation'));
         }
@@ -1202,9 +1206,11 @@ class AssessmentController extends Controller
                     ->groupBy('assessment_id');
 
                 foreach ($results as $row) {
-                    $total_words = ($row->last_word_index + 1);
-                    $correct_words = ($total_words - $row->no_error_words);
-                    $accuracy = $total_words > 0 ? ($correct_words * 100) / $total_words : 0;
+                    $lastWordIndex = $row->last_word_index !== null ? (int) $row->last_word_index : -1;
+                    $total_words = max(0, $lastWordIndex + 1);
+                    $errorWords = (int) ($row->no_error_words ?? 0);
+                    $correct_words = max(0, $total_words - $errorWords);
+                    $accuracy = $total_words > 0 ? round(max(0.0, min(100.0, ($correct_words * 100.0) / $total_words)), 2) : 0.0;
 
                     $student_name = trim($this->tryDecrypt($row->student_first_name) . ' ' . $this->tryDecrypt($row->student_last_name));
                     $conductor_name = trim($row->conductor_first_name . ' ' . $row->conductor_last_name);
@@ -1244,8 +1250,8 @@ class AssessmentController extends Controller
                         $row->grade_level . '-' . $row->passage_number,
                         $row->passage_name,
                         $correct_words,
-                        $row->no_error_words,
-                        round($accuracy, 2),
+                        $errorWords,
+                        $accuracy,
                         $goal,
                         trim($sentence)
                     ]);
@@ -1257,5 +1263,53 @@ class AssessmentController extends Controller
             "Content-Type" => "text/csv",
             "Content-Disposition" => "attachment; filename=\"Overall Analytics.csv\"",
         ]);
+    }
+
+    /**
+     * Generate multi-sheet .xlsx assessment report.
+     *
+     * Accepted query filters:
+     * - organisation (required)
+     * - language
+     * - division (optional; omit for overall totals, supply a division for a filtered report)
+     * - grade (optional)
+     * - type
+     * - from / to (must be supplied together)
+     */
+    public function generateExcelReport(Request $request)
+    {
+        // 1. Organisation is required
+        if (!$request->filled('organisation')) {
+            return response()->json([
+                'message' => 'The organisation parameter is required.',
+            ], 422);
+        }
+
+        // 2. from/to must be supplied together
+        if (
+            ($request->filled('from') && !$request->filled('to')) ||
+            (!$request->filled('from') && $request->filled('to'))
+        ) {
+            return response()->json(['error' => 'Both from and to dates are required together.'], 400);
+        }
+
+        // 3. Boost limits for large exports
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300);
+
+        // 4. Build filters array
+        $filters = [
+            'organisation' => $request->input('organisation'),
+            'language'     => $request->input('language'),
+            'division'     => $request->input('division'),
+            'grade'        => $request->input('grade'),
+            'type'         => $request->input('type'),
+            'from'         => $request->input('from'),
+            'to'           => $request->input('to'),
+        ];
+
+        $filename = 'Assessment_Report_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+
+        return Excel::download(new AssessmentExport($filters), $filename);
     }
 }
