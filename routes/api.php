@@ -192,6 +192,8 @@ Route::middleware(['django.auth'])->group(function () {
 
     // Assessments
     Route::post('/assessments', [AssessmentController::class, 'postAssessments']);
+    Route::get('/assessments/export', [AssessmentController::class, 'generateExcel']);
+    Route::get('/assessments/excel-report', [AssessmentController::class, 'generateExcelReport']);
     Route::get('/assessments', [AssessmentController::class, 'getAssessments']);
     Route::get('/assessments/export', [AssessmentController::class, 'generateExcel']);
     Route::get('/assessments/{id}', [AssessmentController::class, 'getAssessmentDetails']);
