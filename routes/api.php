@@ -70,8 +70,6 @@ Route::get('/teachers/{id}', [TeacherController::class, 'show']);
 Route::get('/users', [UserController::class, 'getUsers']);
 Route::get('/users/{id}', [UserController::class, 'getUserDetails']);
 
-Route::get('/passagePDF/{id}', [User::class, 'getPassagePDFNew']);
-Route::get('/getAudio', [User::class, 'getAudio']);
 Route::get('/getStudentPic/{id}', [User::class, 'getStudentPic']);
 Route::get('/allOrgUsersCount', [User::class, 'allOrgUsersCount']);
 Route::get('/organisationUsersCount/{id}', [User::class, 'organisationUsersCount']);
@@ -207,10 +205,13 @@ Route::middleware(['django.auth'])->group(function () {
 
         Route::post('/bulk-upload-student', [User::class, 'bulkUploadStudent']);
         Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
+
+        Route::get('/passagePDF/{id}', [User::class, 'getPassagePDFNew']);
     });
 
-    Route::middleware(['role:admin,teacher'])->group(function () {
+    Route::middleware(['role:teacher'])->group(function () {
         Route::post('/saveAudio', [User::class, 'saveAudio']);
+        Route::get('/getAudio', [User::class, 'getAudio']);
         Route::post('/saveDeviceDetails/{id}', [User::class, 'saveDeviceDetails']);
     });
 
