@@ -1310,7 +1310,7 @@ class AssessmentController extends Controller
             'organisation' => $request->input('organisation'),
             'language'     => $request->input('language'),
             'division'     => $request->input('division'),
-            'grade'        => $request->input('grade'),
+            'grade'        => $request->input('grade') ?? $request->input('grade__id'),
             'type'         => $request->input('type'),
             'from'         => $request->input('from'),
             'to'           => $request->input('to'),
