@@ -19,6 +19,11 @@ class AdminPermission
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Allow static API token access
+        if ($request->attributes->get('is_static_token')) {
+            return $next($request);
+        }
+
         $user = auth()->user();
 
         if (!$user) {

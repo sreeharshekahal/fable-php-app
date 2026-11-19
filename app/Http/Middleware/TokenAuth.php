@@ -40,6 +40,7 @@ class TokenAuth
         // 1. Check if the token matches the static API token
         $staticToken = env('API_TOKEN');
         if (!empty($staticToken) && is_string($staticToken) && hash_equals($staticToken, $token)) {
+            $request->attributes->set('is_static_token', true);
             return $next($request);
         }
 

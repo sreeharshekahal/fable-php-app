@@ -61,19 +61,7 @@ Route::prefix('rest-auth')->group(function () {
 Route::get('/languages', [LanguageController::class, 'index']);
 Route::get('/languages/{id}', [LanguageController::class, 'show']);
 
-Route::get('/students', [StudentController::class, 'getStudents']);
-Route::get('/students/{id}', [User::class, 'getStudent']);
-
-Route::get('/teachers', [TeacherController::class, 'index']);
-Route::get('/teachers/{id}', [TeacherController::class, 'show']);
-
-Route::get('/users', [UserController::class, 'getUsers']);
-Route::get('/users/{id}', [UserController::class, 'getUserDetails']);
-
-Route::get('/getStudentPic/{id}', [User::class, 'getStudentPic']);
 Route::get('/allOrgUsersCount', [User::class, 'allOrgUsersCount']);
-Route::get('/organisationUsersCount/{id}', [User::class, 'organisationUsersCount']);
-Route::get('/organisations/{id}/groups', [OrganisationGroupController::class, 'getOrganisationGroups']);
 
 /*
 |--------------------------------------------------------------------------
@@ -166,8 +154,7 @@ Route::middleware(['django.auth'])->group(function () {
         Route::get('/passages', [PassageController::class, 'index']);
         Route::get('/passages/{id}', [PassageController::class, 'show']);
 
-        Route::get('/checklists', [AssessmentController::class, 'getChecklists']);
-        Route::get('/checklists/{id}', [AssessmentController::class, 'getChecklistDetails']);
+        // Route::get('/checklists/{id}', [AssessmentController::class, 'getChecklistDetails']);
 
         Route::get('/word-level-analysis', [AssessmentController::class, 'wordLevelAnalysis']);
     });
@@ -197,7 +184,6 @@ Route::middleware(['django.auth'])->group(function () {
     Route::get('/assessments', [AssessmentController::class, 'getAssessments']);
     Route::get('/assessments/export', [AssessmentController::class, 'generateExcel']);
     Route::get('/assessments/{id}', [AssessmentController::class, 'getAssessmentDetails']);
-    Route::get('/generate-excel', [AssessmentController::class, 'generateExcel']);
 
     // Auth integration
     Route::middleware(['role:admin,teacher'])->group(function () {
@@ -209,14 +195,31 @@ Route::middleware(['django.auth'])->group(function () {
         Route::post('/bulk-upload-teacher', [User::class, 'bulkUploadTeacher']);
 
         Route::get('/passagePDF/{id}', [User::class, 'getPassagePDFNew']);
+
+        Route::get('/students', [StudentController::class, 'getStudents']);
+        Route::get('/students/{id}', [User::class, 'getStudent']);
+
+        Route::get('/teachers', [TeacherController::class, 'index']);
+        Route::get('/teachers/{id}', [TeacherController::class, 'show']);
+
+        Route::get('/users', [UserController::class, 'getUsers']);
+        Route::get('/users/{id}', [UserController::class, 'getUserDetails']);
+
+        Route::get('/getStudentPic/{id}', [User::class, 'getStudentPic']);
+
+        Route::get('/organisationUsersCount/{id}', [User::class, 'organisationUsersCount']);
+        Route::get('/organisations/{id}/groups', [OrganisationGroupController::class, 'getOrganisationGroups']);
+
+        Route::get('/generate-excel', [AssessmentController::class, 'generateExcel']);
     });
 
     Route::middleware(['role:teacher'])->group(function () {
         Route::post('/saveAudio', [User::class, 'saveAudio']);
         Route::get('/getAudio', [User::class, 'getAudio']);
         Route::post('/saveDeviceDetails/{id}', [User::class, 'saveDeviceDetails']);
-    });
 
+        Route::get('/checklists', [AssessmentController::class, 'getChecklists']);
+    });
 });
 
 /*

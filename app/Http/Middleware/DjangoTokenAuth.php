@@ -33,6 +33,14 @@ class DjangoTokenAuth
             return response()->json(['error' => 'Unauthorized - Invalid authorization format'], 401);
         }
 
+        // 1. Check if token matches the static API token
+        $staticToken = env('API_TOKEN');
+        if (!empty($staticToken) && is_string($staticToken) && hash_equals($staticToken, $token)) {
+            $request->attributes->set('is_static_token', true);
+            return $next($request);
+        }
+
+        // 2. Dynamic Django auth token
         $authToken = AuthToken::with('user')->where('key', $token)->first();
 
         if (!$authToken) {
