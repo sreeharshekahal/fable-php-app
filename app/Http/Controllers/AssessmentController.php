@@ -1157,8 +1157,19 @@ class AssessmentController extends Controller
         if ($request->filled('division')) {
             $query->where('s.division', $request->input('division'));
         }
-        if ($request->filled('grade')) {
-            $query->where('a.grade_id', $request->input('grade'));
+        $gradeInput = $request->input('grade__id');
+        if ($gradeInput === null || $gradeInput === '') {
+            $gradeInput = $request->input('grade');
+        }
+        if ($gradeInput === null || $gradeInput === '') {
+            $gradeInput = $request->input('grade_ids');
+        }
+        if ($gradeInput !== null && $gradeInput !== '') {
+            $gradeIds = is_array($gradeInput) ? $gradeInput : explode(',', (string) $gradeInput);
+            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            if (!empty($gradeIds)) {
+                $query->whereIn('a.grade_id', $gradeIds);
+            }
         }
         if ($request->filled('organisation')) {
             $query->where('a.organisation_id', $request->input('organisation'));
@@ -1305,12 +1316,28 @@ class AssessmentController extends Controller
         ini_set('memory_limit', '1024M');
         set_time_limit(300);
 
+        $gradeInput = $request->input('grade__id');
+        if ($gradeInput === null || $gradeInput === '') {
+            $gradeInput = $request->input('grade');
+        }
+        if ($gradeInput === null || $gradeInput === '') {
+            $gradeInput = $request->input('grade_ids');
+        }
+        $gradeFilter = null;
+        if ($gradeInput !== null && $gradeInput !== '') {
+            $gradeIds = is_array($gradeInput) ? $gradeInput : explode(',', (string) $gradeInput);
+            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            if (!empty($gradeIds)) {
+                $gradeFilter = $gradeIds;
+            }
+        }
+
         // 4. Build filters array
         $filters = [
             'organisation' => $request->input('organisation'),
             'language'     => $request->input('language'),
             'division'     => $request->input('division'),
-            'grade'        => $request->input('grade') ?? $request->input('grade__id'),
+            'grade'        => $gradeFilter,
             'type'         => $request->input('type'),
             'from'         => $request->input('from'),
             'to'           => $request->input('to'),

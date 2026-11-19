@@ -196,8 +196,14 @@ class AssessmentPeriodStudentDataSheet implements FromQuery, WithTitle, WithHead
         if (isset($this->filters['division']) && $this->filters['division'] !== '') {
             $query->where('s.division', $this->filters['division']);
         }
-        if (isset($this->filters['grade']) && $this->filters['grade'] !== '') {
-            $query->where('a.grade_id', $this->filters['grade']);
+        if (!empty($this->filters['grade'])) {
+            $gradeIds = is_array($this->filters['grade'])
+                ? $this->filters['grade']
+                : explode(',', (string) $this->filters['grade']);
+            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            if (!empty($gradeIds)) {
+                $query->whereIn('a.grade_id', $gradeIds);
+            }
         }
         if (!empty($this->filters['organisation'])) {
             $query->where('a.organisation_id', $this->filters['organisation']);

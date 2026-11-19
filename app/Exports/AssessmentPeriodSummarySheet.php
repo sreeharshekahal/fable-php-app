@@ -146,6 +146,15 @@ class AssessmentPeriodSummarySheet implements FromArray, WithTitle, WithCharts, 
             if (!empty($filters['organisation'])) {
                 $q->where('a.organisation_id', $filters['organisation']);
             }
+            if (!empty($filters['grade'])) {
+                $gradeIds = is_array($filters['grade'])
+                    ? $filters['grade']
+                    : explode(',', (string) $filters['grade']);
+                $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+                if (!empty($gradeIds)) {
+                    $q->whereIn('a.grade_id', $gradeIds);
+                }
+            }
             if (isset($filters['type']) && $filters['type'] !== null && $filters['type'] !== '') {
                 $q->where('a.type', $filters['type']);
             }
