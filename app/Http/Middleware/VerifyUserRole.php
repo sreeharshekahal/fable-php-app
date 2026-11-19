@@ -20,6 +20,11 @@ class VerifyUserRole
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
+        // Allow static API token access
+        if ($request->attributes->get('is_static_token')) {
+            return $next($request);
+        }
+
         $user = auth()->user();
 
         if (!$user) {
