@@ -119,41 +119,84 @@ class AssessmentSummaryData
         return array_values(array_filter(BenchmarkTemplate::PERIODS, fn ($p) => isset($periods[$p])));
     }
 
+    /** @var Collection|null Memoized collection of records */
+    protected ?Collection $cachedRecords = null;
+
+    /**
+     * Retrieve the flat collection of all assessment records matching the filters and period.
+     *
+     * @param array $periods
+     * @return Collection
+     */
+    public function records(array $periods = []): Collection
+    {
+        if ($this->cachedRecords === null) {
+            $retell = DB::table('assessment_assessment_checklists as aac')
+                ->join('assessment_checklist as ac', 'aac.checklist_id', '=', 'ac.id')
+                ->whereColumn('aac.assessment_id', 'a.id')
+                ->whereColumn('ac.language_id', 'p.language_id')
+                ->where('ac.type', 1)
+                ->selectRaw('COUNT(DISTINCT ac.id)');
+
+            $records = $this->query()
+                ->selectSub($retell, 'retell_count')
+                ->orderByRaw('COALESCE(g.level, 999) ASC')
+                ->orderBy('g.title')->orderBy('l.name')->orderBy('a.organisation_id')
+                ->get();
+
+            foreach ($records as $record) {
+                $record->assessment_period = $this->resolveBenchmarkPeriod(
+                    $record->organisation_id,
+                    $record->language_id,
+                    $record->assessment_period
+                );
+            }
+
+            $this->cachedRecords = $records;
+        }
+
+        if (!empty($periods)) {
+            return $this->cachedRecords->filter(fn ($record) => in_array($record->assessment_period, $periods, true));
+        }
+
+        return $this->cachedRecords;
+    }
+
     /** Keep languages separate even when the export has no language filter. */
     public function groups(array $periods = []): Collection
     {
-        // Count distinct retell checklist items for this assessment and passage language.
-        // The summary later tests whether this count reaches two.
-        $retell = DB::table('assessment_assessment_checklists as aac')
-            ->join('assessment_checklist as ac', 'aac.checklist_id', '=', 'ac.id')
-            ->whereColumn('aac.assessment_id', 'a.id')
-            ->whereColumn('ac.language_id', 'p.language_id')
-            ->where('ac.type', 1)
-            ->selectRaw('COUNT(DISTINCT ac.id)');
-
-        $records = $this->query()
-            ->selectSub($retell, 'retell_count')
-            ->orderByRaw('COALESCE(g.level, 999) ASC')
-            ->orderBy('g.title')->orderBy('l.name')->orderBy('a.organisation_id')
-            ->get();
-
-        // Resolve active assessment period using fallback hierarchy if null on record
-        foreach ($records as $record) {
-            $record->assessment_period = $this->resolveBenchmarkPeriod(
-                $record->organisation_id,
-                $record->language_id,
-                $record->assessment_period
-            );
-        }
-
-        // Filter by requested periods if periods are specified
-        if (!empty($periods)) {
-            $records = $records->filter(fn ($record) => in_array($record->assessment_period, $periods, true));
-        }
+        $records = $this->records($periods);
 
         return $records->groupBy(fn ($record) => json_encode([
             $record->organisation_id, $record->grade_id, $record->language_id,
         ]));
+    }
+
+    /**
+     * Determine if all students in the dataset have a valid division assigned.
+     *
+     * If an explicit division filter is provided, returns true.
+     * Otherwise, checks whether the records collection is non-empty and every
+     * student record has a non-empty division string.
+     *
+     * @param Collection|null $records Specific subset to check, or null for all records
+     * @return bool
+     */
+    public function allStudentsHaveDivisions(?Collection $records = null): bool
+    {
+        if (isset($this->filters['division']) && $this->filters['division'] !== '') {
+            return true;
+        }
+
+        $collection = $records ?? $this->records();
+        if ($collection->isEmpty()) {
+            return false;
+        }
+
+        return $collection->every(function ($record) {
+            $division = trim((string) ($record->division ?? ''));
+            return $division !== '';
+        });
     }
 
     public function gradeDisplay(object $record): string

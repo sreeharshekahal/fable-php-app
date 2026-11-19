@@ -228,9 +228,9 @@ class AssessmentPeriodOverviewSheet implements FromArray, WithTitle, WithCharts,
             $rows[] = ['', '', ''];
             $currentRow++;
 
-            // Overall reports show only the grade overview; a division-specific
-            // report also includes the selected division's distribution table/chart.
-            if (isset($this->filters['division']) && $this->filters['division'] !== '') {
+            // If all students have divisions (or explicit division filter is set),
+            // include the division-wise distribution table and chart; otherwise, show only the overall grade overview.
+            if ($summaryData->allStudentsHaveDivisions()) {
                 $this->appendDivisionDistribution($rows, $group, $summaryData, $gradeDisplay);
             }
             $currentRow = count($rows) + 1;

@@ -1292,7 +1292,7 @@ class AssessmentController extends Controller
      * Accepted query filters:
      * - organisation (required)
      * - language
-     * - division (optional; omit for overall totals, supply a division for a filtered report)
+     * - division (optional; if omitted, automatically generates division-wise report when all students have divisions assigned, otherwise overall report)
      * - grade (optional)
      * - type
      * - from / to (must be supplied together)
