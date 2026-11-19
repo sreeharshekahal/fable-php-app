@@ -25,6 +25,7 @@ use App\Services\WordCategorizationService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\AssessmentExport;
+use App\Exports\Traits\HasAssessmentExportHelpers;
 
 class AssessmentController extends Controller
 {
@@ -132,11 +133,13 @@ class AssessmentController extends Controller
         }
         $gradeInput = $request->input('grade__id');
         if ($gradeInput === null || $gradeInput === '') {
+            $gradeInput = $request->input('grade');
+        }
+        if ($gradeInput === null || $gradeInput === '') {
             $gradeInput = $request->input('grade_ids');
         }
         if ($gradeInput !== null && $gradeInput !== '') {
-            $gradeIds = is_array($gradeInput) ? $gradeInput : explode(',', $gradeInput);
-            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            $gradeIds = HasAssessmentExportHelpers::parseUuidList($gradeInput);
             if (!empty($gradeIds)) {
                 $query->whereIn('a.grade_id', $gradeIds);
             }
@@ -1165,8 +1168,7 @@ class AssessmentController extends Controller
             $gradeInput = $request->input('grade_ids');
         }
         if ($gradeInput !== null && $gradeInput !== '') {
-            $gradeIds = is_array($gradeInput) ? $gradeInput : explode(',', (string) $gradeInput);
-            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            $gradeIds = HasAssessmentExportHelpers::parseUuidList($gradeInput);
             if (!empty($gradeIds)) {
                 $query->whereIn('a.grade_id', $gradeIds);
             }
@@ -1325,8 +1327,7 @@ class AssessmentController extends Controller
         }
         $gradeFilter = null;
         if ($gradeInput !== null && $gradeInput !== '') {
-            $gradeIds = is_array($gradeInput) ? $gradeInput : explode(',', (string) $gradeInput);
-            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            $gradeIds = HasAssessmentExportHelpers::parseUuidList($gradeInput);
             if (!empty($gradeIds)) {
                 $gradeFilter = $gradeIds;
             }

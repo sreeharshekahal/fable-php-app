@@ -282,5 +282,49 @@ trait HasAssessmentExportHelpers
         static::$goalCache[$cacheKey] = (int) ($goal ?? 0);
         return static::$goalCache[$cacheKey];
     }
+
+    /**
+     * Parse input into a list of valid UUID strings.
+     * Handles single UUID, comma-delimited strings, URL-encoded / double-encoded strings
+     * (e.g., %252C -> %2C -> ,), and arrays of IDs.
+     *
+     * @param mixed $input
+     * @return array<string>
+     */
+    public static function parseUuidList($input): array
+    {
+        if (empty($input)) {
+            return [];
+        }
+
+        if (is_array($input)) {
+            $result = [];
+            foreach ($input as $item) {
+                $result = array_merge($result, self::parseUuidList($item));
+            }
+            return array_values(array_unique($result));
+        }
+
+        $str = (string) $input;
+        // Repeatedly URL-decode in case of multiple encodings (e.g., %252C -> %2C -> ,)
+        while (str_contains($str, '%')) {
+            $decoded = urldecode($str);
+            if ($decoded === $str) {
+                break;
+            }
+            $str = $decoded;
+        }
+
+        // Extract all valid UUID strings (8-4-4-4-12 hex)
+        preg_match_all('/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/', $str, $matches);
+        if (!empty($matches[0])) {
+            return array_values(array_unique($matches[0]));
+        }
+
+        // Fallback: split by comma / whitespace
+        $parts = preg_split('/[,|\s]+/', $str);
+        return array_values(array_filter(array_map('trim', $parts), fn($id) => $id !== ''));
+    }
 }
+
 

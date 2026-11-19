@@ -72,10 +72,7 @@ class AssessmentSummaryData
             $query->where('s.division', $this->filters['division']);
         }
         if (!empty($this->filters['grade'])) {
-            $gradeIds = is_array($this->filters['grade'])
-                ? $this->filters['grade']
-                : explode(',', (string) $this->filters['grade']);
-            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            $gradeIds = self::parseUuidList($this->filters['grade']);
             if (!empty($gradeIds)) {
                 $query->whereIn('a.grade_id', $gradeIds);
             }

@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use Illuminate\Support\Facades\DB;
+use App\Exports\Traits\HasAssessmentExportHelpers;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithCharts;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -147,10 +148,7 @@ class AssessmentPeriodSummarySheet implements FromArray, WithTitle, WithCharts, 
                 $q->where('a.organisation_id', $filters['organisation']);
             }
             if (!empty($filters['grade'])) {
-                $gradeIds = is_array($filters['grade'])
-                    ? $filters['grade']
-                    : explode(',', (string) $filters['grade']);
-                $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+                $gradeIds = HasAssessmentExportHelpers::parseUuidList($filters['grade']);
                 if (!empty($gradeIds)) {
                     $q->whereIn('a.grade_id', $gradeIds);
                 }
