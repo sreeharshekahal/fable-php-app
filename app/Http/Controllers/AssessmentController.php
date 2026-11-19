@@ -130,8 +130,16 @@ class AssessmentController extends Controller
         if ($request->filled('organisation__id')) {
             $query->where('a.organisation_id', $request->input('organisation__id'));
         }
-        if ($request->filled('grade__id')) {
-            $query->where('a.grade_id', $request->input('grade__id'));
+        $gradeInput = $request->input('grade__id');
+        if ($gradeInput === null || $gradeInput === '') {
+            $gradeInput = $request->input('grade_ids');
+        }
+        if ($gradeInput !== null && $gradeInput !== '') {
+            $gradeIds = is_array($gradeInput) ? $gradeInput : explode(',', $gradeInput);
+            $gradeIds = array_values(array_filter(array_map('trim', $gradeIds), fn($id) => $id !== ''));
+            if (!empty($gradeIds)) {
+                $query->whereIn('a.grade_id', $gradeIds);
+            }
         }
 
         // Language Filters
