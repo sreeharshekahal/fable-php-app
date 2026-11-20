@@ -302,9 +302,6 @@ class AssessmentSummaryData
             if ($lower === false || $upper === false || $lower < 0 || $upper < $lower) {
                 $this->invalid($context, "Invalid benchmark boundaries for {$keys[$rank]}.");
             }
-            if ($rank > 1 && $upper + 1 !== $result[$keys[$rank - 1]]['lower']) {
-                $this->invalid($context, 'Benchmark boundaries contain a gap or overlap.');
-            }
             if ($rank === 4 && $lower !== 0) {
                 $this->invalid($context, 'High Priority benchmark boundaries must start at zero.');
             }
