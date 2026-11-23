@@ -172,31 +172,10 @@ class AssessmentSummaryData
         ]));
     }
 
-    /**
-     * Determine if all students in the dataset have a valid division assigned.
-     *
-     * If an explicit division filter is provided, returns true.
-     * Otherwise, checks whether the records collection is non-empty and every
-     * student record has a non-empty division string.
-     *
-     * @param Collection|null $records Specific subset to check, or null for all records
-     * @return bool
-     */
-    public function allStudentsHaveDivisions(?Collection $records = null): bool
+    /** Report layout is explicitly selected, independently of population completeness. */
+    public function isDivisionReport(): bool
     {
-        if (isset($this->filters['division']) && $this->filters['division'] !== '') {
-            return true;
-        }
-
-        $collection = $records ?? $this->records();
-        if ($collection->isEmpty()) {
-            return false;
-        }
-
-        return $collection->every(function ($record) {
-            $division = trim((string) ($record->division ?? ''));
-            return $division !== '';
-        });
+        return ($this->filters['report_type'] ?? 'overall') === 'division';
     }
 
     public function gradeDisplay(object $record): string

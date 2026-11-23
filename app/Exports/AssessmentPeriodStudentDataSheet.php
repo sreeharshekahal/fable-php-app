@@ -323,7 +323,9 @@ class AssessmentPeriodStudentDataSheet implements FromQuery, WithTitle, WithHead
         return [
             $row->organisation_name,
             $student_name,
-            $row->division ?? '',
+            ($this->filters['report_type'] ?? 'overall') === 'division'
+                ? (trim((string) ($row->division ?? '')) !== '' ? trim((string) $row->division) : 'Unassigned')
+                : ($row->division ?? ''),
             $row->language_name ?? '',
             $gradeTitle,
             $row->assessment_type_code == 1 ? 'G' . $row->grade_level . ' Benchmarking' : $row->group_title,

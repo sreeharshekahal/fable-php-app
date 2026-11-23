@@ -152,6 +152,12 @@ class AssessmentPeriodOverviewSheet implements FromArray, WithTitle, WithCharts,
 
         foreach ($groups as $group) {
             $gradeDisplay = $summaryData->gradeDisplay($group->first());
+            if ($summaryData->isDivisionReport()) {
+                $this->appendDivisionDistribution($rows, $group, $summaryData, $gradeDisplay);
+                $currentRow = count($rows) + 1;
+                continue;
+            }
+
             $summary = $summaryData->summarize($group);
             $totalStudents = $summary['totalStudents'];
             $metrics = $summary['levelMetrics'];
@@ -228,11 +234,6 @@ class AssessmentPeriodOverviewSheet implements FromArray, WithTitle, WithCharts,
             $rows[] = ['', '', ''];
             $currentRow++;
 
-            // If all students have divisions (or explicit division filter is set),
-            // include the division-wise distribution table and chart; otherwise, show only the overall grade overview.
-            if ($summaryData->allStudentsHaveDivisions()) {
-                $this->appendDivisionDistribution($rows, $group, $summaryData, $gradeDisplay);
-            }
             $currentRow = count($rows) + 1;
         }
 

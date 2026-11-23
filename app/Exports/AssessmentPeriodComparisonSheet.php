@@ -142,13 +142,12 @@ class AssessmentPeriodComparisonSheet implements FromArray, WithTitle, WithChart
 
         $currentRow = 1;
 
-        $hasDivision = $summaryData->allStudentsHaveDivisions();
+        $hasDivision = $summaryData->isDivisionReport();
 
         foreach ($groups as $group) {
             $gradeDisplay = $summaryData->gradeDisplay($group->first());
             $gradeStartRow = $currentRow;
-            // If all students have divisions (or explicit division filter is set),
-            // group by division for a division-wise comparison; otherwise, aggregate the whole grade.
+            // Group by division only when explicitly requested.
             $divisions = $hasDivision
                 ? $group->groupBy(fn ($record) => trim((string) ($record->division ?? '')))
                     ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)
@@ -462,7 +461,7 @@ class AssessmentPeriodComparisonSheet implements FromArray, WithTitle, WithChart
     {
         // Overall reports show grade and period metrics without a division column.
         // Keep its underlying coordinates stable for merged cells and chart references.
-        $hasDivision = $this->summaryData()->allStudentsHaveDivisions();
+        $hasDivision = $this->summaryData()->isDivisionReport();
         $sheet->getColumnDimension('B')->setVisible($hasDivision);
 
         foreach ($this->gradeBlocks as $b) {

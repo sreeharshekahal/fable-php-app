@@ -1292,7 +1292,8 @@ class AssessmentController extends Controller
      * Accepted query filters:
      * - organisation (required)
      * - language
-     * - division (optional; if omitted, automatically generates division-wise report when all students have divisions assigned, otherwise overall report)
+     * - division (optional student division filter)
+     * - report_type (overall or division; defaults to overall)
      * - grade (optional)
      * - type
      * - from / to (must be supplied together)
@@ -1313,6 +1314,9 @@ class AssessmentController extends Controller
         ) {
             return response()->json(['error' => 'Both from and to dates are required together.'], 400);
         }
+
+        $request->validate(['report_type' => 'sometimes|required|in:overall,division']);
+        $reportType = $request->input('report_type', 'overall');
 
         // 3. Boost limits for large exports
         ini_set('memory_limit', '1024M');
@@ -1335,6 +1339,7 @@ class AssessmentController extends Controller
 
         // 4. Build filters array
         $filters = [
+            'report_type'  => $reportType,
             'organisation' => $request->input('organisation'),
             'language'     => $request->input('language'),
             'division'     => $request->input('division'),
