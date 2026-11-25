@@ -206,23 +206,6 @@ class StudentAssessmentReportService
         $includeProgressMonitoring = $graphFilters['progress_monitoring'];
         $includeBenchmarking = $graphFilters['benchmarking'];
 
-        // E. Filter assessments by assessment type (Progress Monitoring / Benchmarking)
-        $displayAssessments = $filteredAssessments;
-        if ($includeProgressMonitoring && !$includeBenchmarking) {
-            $displayAssessments = $filteredAssessments->filter(fn($a) => (int)$a->type === 0)->values();
-        } elseif (!$includeProgressMonitoring && $includeBenchmarking) {
-            $displayAssessments = $filteredAssessments->filter(fn($a) => (int)$a->type === 1)->values();
-        } elseif (!$includeProgressMonitoring && !$includeBenchmarking) {
-            $displayAssessments = collect([]);
-        }
-
-        // 8. Assessment Data Summary (Accuracy, Errors/Min, Correct Words/Min, Benchmarking Grade)
-        $assessmentDataSummary = $this->calculateAssessmentDataSummary(
-            $displayAssessments,
-            $student,
-            $academicYearAssessments
-        );
-
         // 9. Retell and Fluency Quality (Checklist)
         $retellFluencyQuality = null;
         if ($includeRetellFluency) {
@@ -289,7 +272,6 @@ class StudentAssessmentReportService
                     'benchmarking' => $includeBenchmarking,
                 ],
             ],
-            'assessment_data' => $assessmentDataSummary,
             'retell_and_fluency_quality' => $retellFluencyQuality,
             'trend_analysis' => $trendAnalysis,
         ];
@@ -356,61 +338,6 @@ class StudentAssessmentReportService
             'academic_year' => $academicYear,
             'start_year' => $latestBoyYear,
             'assessments' => $cycleAssessments,
-        ];
-    }
-
-    /**
-     * Calculate Assessment Data Summary (Accuracy, Errors/Min, Correct Words/Min, Benchmarking Grade).
-     */
-    protected function calculateAssessmentDataSummary(
-        Collection $assessments,
-        Student $student,
-        Collection $fullCycleAssessments
-    ): array {
-        $benchmarkingGrade = $student->grade->title ?? ('Grade ' . ($student->grade->level ?? '3'));
-
-        // Prefer latest benchmarking assessment (type 1)
-        $latestBenchmarking = $assessments->filter(fn($a) => (int)$a->type === 1)
-            ->sortByDesc('created')
-            ->first();
-
-        // Fallback to latest benchmarking in full cycle, or latest overall
-        if (!$latestBenchmarking) {
-            $latestBenchmarking = $fullCycleAssessments->filter(fn($a) => (int)$a->type === 1)
-                ->sortByDesc('created')
-                ->first();
-        }
-
-        if (!$latestBenchmarking) {
-            $latestBenchmarking = $assessments->sortByDesc('created')->first();
-        }
-
-        if ($latestBenchmarking) {
-            $totalWords = (int)($latestBenchmarking->last_word_index + 1);
-            $errors = (int)$latestBenchmarking->no_error_words;
-            $correctWords = max(0, $totalWords - $errors);
-            $accuracy = $totalWords > 0 ? round(($correctWords / $totalWords) * 100) : 0;
-
-            return [
-                'benchmarking_grade' => $benchmarkingGrade,
-                'accuracy' => (int)$accuracy,
-                'accuracy_formatted' => $accuracy . '%',
-                'errors_per_minute' => $errors,
-                'error_mean' => $errors,
-                'correct_words_per_minute' => $correctWords,
-                'total_assessments_count' => $assessments->count(),
-            ];
-        }
-
-        // If no assessments at all, return zeros
-        return [
-            'benchmarking_grade' => $benchmarkingGrade,
-            'accuracy' => 0,
-            'accuracy_formatted' => '0%',
-            'errors_per_minute' => 0,
-            'error_mean' => 0,
-            'correct_words_per_minute' => 0,
-            'total_assessments_count' => 0,
         ];
     }
 
@@ -799,6 +726,7 @@ class StudentAssessmentReportService
         $totalWords = (int)($item->last_word_index + 1);
         $errors = (int)$item->no_error_words;
         $score = max(0, $totalWords - $errors);
+        $accuracy = $totalWords > 0 ? round(($score / $totalWords) * 100) : 0;
 
         // Passage Title
         $passageTitle = $item->passage_name ?: 'Passage';
@@ -856,7 +784,11 @@ class StudentAssessmentReportService
             'passage_name' => $passageTitle,
             'score' => $score,
             'goal' => $goal,
-            'accuracy' => $totalWords > 0 ? round(($score / $totalWords) * 100) : 0,
+            'accuracy' => $accuracy,
+            'accuracy_formatted' => $accuracy . '%',
+            'errors_per_minute' => $errors,
+            'error_mean' => $errors,
+            'correct_words_per_minute' => $score,
             'errors' => $errors,
             'teacher_notes' => $item->notes,
             'audio_download_url' => $audioDownloadUrl,
