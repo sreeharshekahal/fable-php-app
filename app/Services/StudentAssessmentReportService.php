@@ -787,7 +787,6 @@ class StudentAssessmentReportService
             'accuracy' => $accuracy,
             'accuracy_formatted' => $accuracy . '%',
             'errors_per_minute' => $errors,
-            'error_mean' => $errors,
             'correct_words_per_minute' => $score,
             'errors' => $errors,
             'teacher_notes' => $item->notes,
